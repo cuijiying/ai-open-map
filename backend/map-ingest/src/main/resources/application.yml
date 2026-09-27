@@ -1,0 +1,56 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: map-ingest
+  config:
+    import: classpath:datasource-druid.yml
+  datasource:
+    druid:
+      name: map-ingest
+      max-active: 8
+  sql:
+    init:
+      mode: always
+      encoding: UTF-8
+      schema-locations: classpath:schema.sql
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        fail-fast: false
+    discovery:
+      enabled: false
+    service-registry:
+      auto-registration:
+        enabled: false
+  jackson:
+    default-property-inclusion: non_null
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+osm:
+  ingest:
+    data-dir: ${OSM_DATA_DIR:../../data/osm}
+    cron: "0 0 3 * * ?"
+    schedule-enabled: true
+    user-agent: "AIOpenMap/0.1 (local WebGIS)"
+    include-buildings: true
+    regions:
+      - code: anhui
+        name: 安徽省
+        url: https://download.geofabrik.de/asia/china/anhui-latest.osm.pbf
+        md5-url: https://download.geofabrik.de/asia/china/anhui-latest.osm.pbf.md5
+
+logging:
+  charset:
+    console: UTF-8
+    file: UTF-8
+  file:
+    name: ${user.dir}/logs/map-ingest.log

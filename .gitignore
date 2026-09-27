@@ -1,0 +1,12 @@
+target/
+node_modules/
+dist/
+logs/
+data/osm/*.pbf
+data/osm/*.part
+data/osm/*.md5
+.idea/
+.vscode/
+*.iml
+.DS_Store
+*.log

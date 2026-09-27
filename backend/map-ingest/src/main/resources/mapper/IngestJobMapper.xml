@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aomap.ingest.mapper.IngestJobMapper">
+
+    <sql id="jobColumns">
+        id, region_code, region_name, status, phase, progress, message, source_url,
+        file_bytes, feature_count, CAST(layer_counts AS text) AS layer_counts, trigger_type,
+        started_at, finished_at, error
+    </sql>
+
+    <update id="failStaleRunning">
+        UPDATE ingest_job
+           SET status = 'FAILED',
+               phase = 'FAILED',
+               error = '服务重启，任务已中断',
+               message = '服务重启，任务已中断',
+               finished_at = now()
+         WHERE status = 'RUNNING'
+    </update>
+
+    <insert id="insertRunning" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO ingest_job
+            (region_code, region_name, status, phase, progress, message, source_url, trigger_type, started_at)
+        VALUES
+            (#{regionCode}, #{regionName}, 'RUNNING', 'DOWNLOAD', 0, '任务已创建，准备下载', #{sourceUrl}, #{triggerType}, now())
+    </insert>
+
+    <update id="updateProgress">
+        UPDATE ingest_job
+           SET phase = #{phase},
+               progress = #{progress},
+               message = #{message}
+         WHERE id = #{id}
+           AND status = 'RUNNING'
+    </update>
+
+    <update id="updateFile">
+        UPDATE ingest_job
+           SET file_path = #{path},
+               file_bytes = #{bytes}
+         WHERE id = #{id}
+    </update>
+
+    <update id="succeed">
+        UPDATE ingest_job
+           SET status = 'SUCCESS',
+               phase = 'SUCCESS',
+               progress = 100,
+               message = #{message},
+               feature_count = #{featureCount},
+               layer_counts = CAST(#{layerCounts} AS jsonb),
+               finished_at = now(),
+               error = NULL
+         WHERE id = #{id}
+    </update>
+
+    <update id="fail">
+        UPDATE ingest_job
+           SET status = 'FAILED',
+               phase = 'FAILED',
+               message = #{message},
+               error = #{message},
+               finished_at = now()
+         WHERE id = #{id}
+           AND status = 'RUNNING'
+    </update>
+
+    <insert id="insertLog">
+        INSERT INTO ingest_job_log (job_id, phase, level, message)
+        VALUES (#{jobId}, #{phase}, #{level}, #{message})
+    </insert>
+
+    <select id="findById" resultType="com.aomap.ingest.domain.IngestJobRecord">
+        SELECT <include refid="jobColumns"/>
+          FROM ingest_job
+         WHERE id = #{id}
+    </select>
+
+    <select id="findLatest" resultType="com.aomap.ingest.domain.IngestJobRecord">
+        SELECT <include refid="jobColumns"/>
+          FROM ingest_job
+         ORDER BY id DESC
+         LIMIT 1
+    </select>
+
+    <select id="list" resultType="com.aomap.ingest.domain.IngestJobRecord">
+        SELECT <include refid="jobColumns"/>
+          FROM ingest_job
+         ORDER BY id DESC
+         LIMIT #{limit}
+    </select>
+
+    <select id="logs" resultType="com.aomap.ingest.domain.JobLogRecord">
+        SELECT id, phase, level, message, created_at
+          FROM ingest_job_log
+         WHERE job_id = #{jobId}
+           AND id &gt; #{afterId}
+         ORDER BY id
+         LIMIT 300
+    </select>
+</mapper>

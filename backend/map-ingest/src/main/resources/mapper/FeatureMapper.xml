@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aomap.ingest.mapper.FeatureMapper">
+
+    <update id="truncateStage">
+        TRUNCATE osm_feature_stage
+    </update>
+
+    <select id="countStage" resultType="long">
+        SELECT COUNT(*) FROM osm_feature_stage
+    </select>
+
+    <update id="disableStatementTimeout">
+        SET LOCAL statement_timeout = 0
+    </update>
+
+    <update id="dropGeomIndex">
+        DROP INDEX IF EXISTS idx_osm_feature_geom
+    </update>
+
+    <update id="dropLayerIndex">
+        DROP INDEX IF EXISTS idx_osm_feature_layer
+    </update>
+
+    <update id="dropNameIndex">
+        DROP INDEX IF EXISTS idx_osm_feature_name
+    </update>
+
+    <update id="truncateFeatures">
+        TRUNCATE osm_feature
+    </update>
+
+    <insert id="insertFromStage">
+        INSERT INTO osm_feature (osm_id, osm_type, layer, sub_type, name, props, geom, job_id)
+        SELECT osm_id,
+               osm_type,
+               layer,
+               sub_type,
+               NULLIF(name, ''),
+               CASE WHEN props IS NULL OR props = '' THEN NULL ELSE CAST(props AS jsonb) END,
+               ST_GeomFromText(wkt, 4326),
+               #{jobId}
+          FROM osm_feature_stage
+         WHERE wkt IS NOT NULL
+           AND wkt &lt;&gt; ''
+    </insert>
+
+    <update id="createGeomIndex">
+        CREATE INDEX idx_osm_feature_geom ON osm_feature USING GIST (geom)
+    </update>
+
+    <update id="createLayerIndex">
+        CREATE INDEX idx_osm_feature_layer ON osm_feature (layer, sub_type)
+    </update>
+
+    <update id="createNameIndex">
+        CREATE INDEX idx_osm_feature_name ON osm_feature USING GIN (name gin_trgm_ops)
+    </update>
+
+    <update id="analyzeFeatures">
+        ANALYZE osm_feature
+    </update>
+
+    <select id="countFeatures" resultType="long">
+        SELECT COUNT(*) FROM osm_feature
+    </select>
+
+    <select id="countByLayer" resultType="com.aomap.ingest.domain.LayerCountRow">
+        SELECT layer, COUNT(*) AS count
+          FROM osm_feature
+         GROUP BY layer
+    </select>
+</mapper>
