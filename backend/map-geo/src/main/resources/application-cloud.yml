@@ -1,0 +1,10 @@
+spring:
+  cloud:
+    nacos:
+      discovery:
+        enabled: true
+    discovery:
+      enabled: true
+    service-registry:
+      auto-registration:
+        enabled: true

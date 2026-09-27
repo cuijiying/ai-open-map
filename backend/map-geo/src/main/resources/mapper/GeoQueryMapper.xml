@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aomap.geo.mapper.GeoQueryMapper">
+
+    <select id="countByLayer" resultType="com.aomap.geo.domain.NameCount">
+        SELECT layer AS name, COUNT(*) AS count
+          FROM osm_feature
+         GROUP BY layer
+    </select>
+
+    <select id="stats" resultType="com.aomap.geo.domain.NameCount">
+        SELECT sub_type AS name, COUNT(*) AS count
+          FROM osm_feature
+         WHERE layer = #{layer}
+         GROUP BY sub_type
+         ORDER BY COUNT(*) DESC
+         LIMIT 30
+    </select>
+
+    <select id="search" resultType="com.aomap.geo.domain.SearchRow">
+        SELECT osm_id,
+               layer,
+               sub_type AS subtype,
+               COALESCE(name, '') AS name,
+               ST_X(ST_PointOnSurface(geom)) AS lon,
+               ST_Y(ST_PointOnSurface(geom)) AS lat
+          FROM osm_feature
+         WHERE (
+                name ILIKE #{pattern} ESCAPE '!'
+                OR sub_type ILIKE #{pattern} ESCAPE '!'
+               )
+           <if test="layer != null and layer != ''">
+           AND layer = #{layer}
+           </if>
+         ORDER BY CASE WHEN name ILIKE #{pattern} ESCAPE '!' THEN 0 ELSE 1 END,
+                  length(COALESCE(name, sub_type))
+         LIMIT #{limit}
+    </select>
+
+    <select id="analyze" resultType="com.aomap.geo.domain.AnalysisRow">
+        SELECT COUNT(*) AS count,
+               COALESCE(SUM(ST_Length(CAST(geom AS geography))), 0) AS length_meters,
+               COALESCE(SUM(ST_Area(CAST(geom AS geography))), 0) AS area_square_meters
+          FROM osm_feature
+         WHERE layer = #{layer}
+           AND geom &amp;&amp; ST_MakeEnvelope(#{minLon}, #{minLat}, #{maxLon}, #{maxLat}, 4326)
+    </select>
+</mapper>

@@ -1,0 +1,53 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: map-gateway
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        fail-fast: false
+    discovery:
+      enabled: false
+    service-registry:
+      auto-registration:
+        enabled: false
+    gateway:
+      httpclient:
+        connect-timeout: 5000
+        response-timeout: 120s
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOriginPatterns: "*"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+      routes:
+        - id: ingest
+          uri: http://127.0.0.1:8081
+          predicates:
+            - Path=/api/ingest/**
+        - id: geo
+          uri: http://127.0.0.1:8082
+          predicates:
+            - Path=/api/geo/**,/api/tiles/**
+        - id: ai
+          uri: http://127.0.0.1:8083
+          predicates:
+            - Path=/api/ai/**
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  charset:
+    console: UTF-8
+    file: UTF-8
+  file:
+    name: ${user.dir}/logs/map-gateway.log

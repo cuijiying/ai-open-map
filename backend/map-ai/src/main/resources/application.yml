@@ -1,0 +1,42 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: map-ai
+  config:
+    import: classpath:datasource-druid.yml
+  datasource:
+    druid:
+      name: map-ai
+      max-active: 4
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        fail-fast: false
+    discovery:
+      enabled: false
+    service-registry:
+      auto-registration:
+        enabled: false
+  jackson:
+    default-property-inclusion: non_null
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+app:
+  geo:
+    base-url: ${GEO_BASE_URL:http://127.0.0.1:8082}
+
+logging:
+  charset:
+    console: UTF-8
+    file: UTF-8
+  file:
+    name: ${user.dir}/logs/map-ai.log

@@ -1,0 +1,24 @@
+spring:
+  cloud:
+    nacos:
+      discovery:
+        enabled: true
+    discovery:
+      enabled: true
+    service-registry:
+      auto-registration:
+        enabled: true
+    gateway:
+      routes:
+        - id: ingest
+          uri: lb://map-ingest
+          predicates:
+            - Path=/api/ingest/**
+        - id: geo
+          uri: lb://map-geo
+          predicates:
+            - Path=/api/geo/**,/api/tiles/**
+        - id: ai
+          uri: lb://map-ai
+          predicates:
+            - Path=/api/ai/**

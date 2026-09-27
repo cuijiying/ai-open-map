@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aomap.geo.mapper.TileMapper">
+
+    <select id="mvt" resultType="string">
+        WITH bounds AS (
+            SELECT ST_TileEnvelope(#{z}, #{x}, #{y}) AS g3857,
+                   ST_Transform(ST_TileEnvelope(#{z}, #{x}, #{y}), 4326) AS g4326
+        ),
+        rows AS (
+            SELECT ST_AsMVTGeom(
+                       ST_Transform(
+                           CASE
+                               WHEN #{z} &lt;= 8 THEN ST_SimplifyPreserveTopology(f.geom, 0.002)
+                               WHEN #{z} &lt;= 11 THEN ST_SimplifyPreserveTopology(f.geom, 0.00035)
+                               ELSE f.geom
+                           END,
+                           3857
+                       ),
+                       b.g3857, 4096, 64, true
+                   ) AS geom,
+                   COALESCE(f.name, '') AS name,
+                   f.sub_type AS subtype,
+                   f.layer AS layer,
+                   CAST(f.osm_id AS text) AS osm_id
+              FROM osm_feature f
+              CROSS JOIN bounds b
+             WHERE f.layer = #{layer}
+               AND f.geom &amp;&amp; b.g4326
+            <if test="layer == 'highway'">
+               AND (
+                    #{z} &gt;= 14
+                    OR f.sub_type NOT IN ('service','footway','path','cycleway','track','steps','pedestrian','bridleway','corridor')
+               )
+               AND (
+                    #{z} &gt;= 11
+                    OR f.sub_type IN ('motorway','motorway_link','trunk','trunk_link','primary','primary_link','secondary','secondary_link','tertiary','tertiary_link')
+               )
+               AND (
+                    #{z} &gt;= 6
+                    OR f.sub_type IN ('motorway','motorway_link','trunk','trunk_link','primary','primary_link')
+               )
+            </if>
+            <if test="layer == 'building' or layer == 'poi'">
+               AND #{z} &gt;= 13
+            </if>
+            <if test="layer == 'landuse'">
+               AND #{z} &gt;= 10
+            </if>
+            <if test="layer == 'waterway'">
+               AND #{z} &gt;= 7
+               AND (
+                    #{z} &gt;= 12
+                    OR f.sub_type IN ('river','canal','flowline')
+               )
+            </if>
+            <if test="layer == 'water'">
+               AND #{z} &gt;= 6
+            </if>
+            <if test="layer == 'railway'">
+               AND #{z} &gt;= 8
+            </if>
+            <if test="layer == 'boundary'">
+               AND #{z} &gt;= 4
+            </if>
+            <if test="layer == 'place'">
+               AND (
+                    #{z} &gt;= 11
+                    OR (#{z} &gt;= 8 AND f.sub_type IN ('city','town','county','suburb','quarter'))
+                    OR f.sub_type IN ('city','town')
+               )
+            </if>
+        )
+        <!-- bytea 不走 MyBatis 的 byte[] 映射：该别名实际是 Byte[]，运行期会抛出 argument type mismatch。 -->
+        SELECT encode(ST_AsMVT(rows, #{layer}, 4096, 'geom'), 'base64')
+          FROM rows
+         WHERE geom IS NOT NULL
+    </select>
+</mapper>

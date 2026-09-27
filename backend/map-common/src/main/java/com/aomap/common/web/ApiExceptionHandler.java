@@ -16,6 +16,7 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResult<Void>> badRequest(IllegalArgumentException ex) {
+        log.warn("请求参数或查询结果无法处理: {}", ex.getMessage());
         return ResponseEntity.badRequest().body(ApiResult.fail(ex.getMessage()));
     }
 

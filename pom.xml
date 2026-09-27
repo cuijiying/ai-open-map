@@ -21,6 +21,9 @@
     <modules>
         <module>backend/map-common</module>
         <module>backend/map-ingest</module>
+        <module>backend/map-geo</module>
+        <module>backend/map-ai</module>
+        <module>backend/map-gateway</module>
     </modules>
 
     <properties>

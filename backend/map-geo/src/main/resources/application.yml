@@ -1,0 +1,41 @@
+server:
+  port: 8082
+  compression:
+    enabled: true
+    mime-types: application/json,application/vnd.mapbox-vector-tile
+
+spring:
+  application:
+    name: map-geo
+  config:
+    import: classpath:datasource-druid.yml
+  datasource:
+    druid:
+      name: map-geo
+      max-active: 16
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        fail-fast: false
+    discovery:
+      enabled: false
+    service-registry:
+      auto-registration:
+        enabled: false
+  jackson:
+    default-property-inclusion: non_null
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  charset:
+    console: UTF-8
+    file: UTF-8
+  file:
+    name: ${user.dir}/logs/map-geo.log
