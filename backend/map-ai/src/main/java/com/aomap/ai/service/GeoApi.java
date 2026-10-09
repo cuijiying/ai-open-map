@@ -22,19 +22,23 @@ public class GeoApi {
         this.client = RestClient.builder().baseUrl(baseUrl).build();
     }
 
-    public List<LayerCount> layers() {
-        return body(client.get().uri("/api/geo/layers"), new ParameterizedTypeReference<ApiResult<List<LayerCount>>>() {
+    public List<LayerCount> layers(String region) {
+        String uri = UriComponentsBuilder.fromPath("/api/geo/layers").queryParam("region", region).build().toUriString();
+        return body(client.get().uri(uri), new ParameterizedTypeReference<ApiResult<List<LayerCount>>>() {
         });
     }
 
-    public List<StatItem> stats(String layer) {
-        String uri = UriComponentsBuilder.fromPath("/api/geo/stats").queryParam("layer", layer).build().toUriString();
+    public List<StatItem> stats(String region, String layer) {
+        String uri = UriComponentsBuilder.fromPath("/api/geo/stats").queryParam("region", region).queryParam("layer", layer).build().toUriString();
         return body(client.get().uri(uri), new ParameterizedTypeReference<ApiResult<List<StatItem>>>() {
         });
     }
 
-    public List<SearchHit> search(String keyword, String layer) {
-        UriComponentsBuilder builder = UriComponentsBuilder.fromPath("/api/geo/search").queryParam("keyword", keyword).queryParam("limit", 8);
+    public List<SearchHit> search(String region, String keyword, String layer) {
+        UriComponentsBuilder builder = UriComponentsBuilder.fromPath("/api/geo/search")
+                .queryParam("region", region)
+                .queryParam("keyword", keyword)
+                .queryParam("limit", 8);
         if (layer != null && !layer.isBlank()) {
             builder.queryParam("layer", layer);
         }
@@ -42,8 +46,9 @@ public class GeoApi {
         });
     }
 
-    public AnalysisResult analyze(String layer, double minLon, double minLat, double maxLon, double maxLat) {
+    public AnalysisResult analyze(String region, String layer, double minLon, double minLat, double maxLon, double maxLat) {
         String uri = UriComponentsBuilder.fromPath("/api/geo/analyze")
+                .queryParam("region", region)
                 .queryParam("layer", layer)
                 .queryParam("minLon", minLon)
                 .queryParam("minLat", minLat)

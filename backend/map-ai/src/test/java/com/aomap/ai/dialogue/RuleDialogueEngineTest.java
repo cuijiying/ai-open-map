@@ -10,6 +10,18 @@ class RuleDialogueEngineTest {
     private final RuleDialogueEngine engine = new RuleDialogueEngine();
 
     @Test
+    void fliesToHangzhouAndResetsToCurrentProvince() {
+        DialoguePlan hangzhou = engine.plan("定位到杭州").orElseThrow();
+        MapAction fly = hangzhou.actions().stream().filter(action -> "fly_to".equals(action.type())).findFirst().orElseThrow();
+        assertEquals(120.155, fly.center().get(0), 0.01);
+        assertEquals(30.274, fly.center().get(1), 0.01);
+        DialoguePlan reset = engine.plan("重置地图", "zhejiang").orElseThrow();
+        MapAction back = reset.actions().stream().filter(action -> "fly_to".equals(action.type())).findFirst().orElseThrow();
+        assertEquals(120.20, back.center().get(0), 0.01);
+        assertTrue(reset.reply().contains("浙江省"));
+    }
+
+    @Test
     void fliesToHefei() {
         DialoguePlan plan = engine.plan("定位到合肥").orElseThrow();
         MapAction fly = plan.actions().stream().filter(action -> "fly_to".equals(action.type())).findFirst().orElseThrow();

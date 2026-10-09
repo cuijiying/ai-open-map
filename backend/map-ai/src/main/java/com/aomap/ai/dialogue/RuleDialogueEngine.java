@@ -1,6 +1,7 @@
 package com.aomap.ai.dialogue;
 
 import com.aomap.common.geo.Layers;
+import com.aomap.common.geo.Regions;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -15,7 +16,7 @@ public class RuleDialogueEngine {
             我可以帮你操作地图。未配置模型时，直接说这些指令即可：
             · 显示道路 / 水系 / 建筑 / 铁路 / 土地利用 / 兴趣点 / 地名 / 行政区划
             · 只显示高速公路，或隐藏建筑
-            · 定位到合肥、黄山、芜湖等安徽城市
+            · 定位到合肥、杭州、成都，或各省名称
             · 统计道路数量，或查找大学
             · 分析当前视野内的道路里程
             · 重置地图
@@ -23,8 +24,20 @@ public class RuleDialogueEngine {
 
     private static final List<String> DEFAULT_LAYERS = List.of("highway", "waterway", "water", "place", "boundary");
 
-    private static final List<Place> PLACES = List.of(
-            new Place("安徽省", 117.283, 31.861, 6.5),
+    private static final List<Place> PLACES = places();
+
+    private static List<Place> places() {
+        List<Place> places = new ArrayList<>();
+        for (Regions.Region region : Regions.ALL) {
+            places.add(new Place(region.name(), region.lon(), region.lat(), region.zoom()));
+            if (!region.shortName().equals(region.name())) {
+                places.add(new Place(region.shortName(), region.lon(), region.lat(), region.zoom()));
+            }
+            if (!region.capital().equals(region.shortName()) && !region.capital().equals(region.name())) {
+                places.add(new Place(region.capital(), region.capitalLon(), region.capitalLat(), 11));
+            }
+        }
+        places.addAll(List.of(
             new Place("黄山市", 118.338, 29.715, 10),
             new Place("合肥市", 117.227, 31.821, 11),
             new Place("马鞍山", 118.508, 31.670, 11),
@@ -58,7 +71,9 @@ public class RuleDialogueEngine {
             new Place("宣城", 118.759, 30.941, 11),
             new Place("巢湖", 117.874, 31.598, 11),
             new Place("九华山", 117.803, 30.478, 12)
-    );
+        ));
+        return List.copyOf(places);
+    }
 
     private static final List<LayerWord> LAYER_WORDS = List.of(
             new LayerWord(List.of("water", "waterway"), List.of("水系", "河流", "湖泊", "水体"), null),
@@ -74,6 +89,10 @@ public class RuleDialogueEngine {
     );
 
     public Optional<DialoguePlan> plan(String raw) {
+        return plan(raw, null);
+    }
+
+    public Optional<DialoguePlan> plan(String raw, String regionCode) {
         if (raw == null || raw.isBlank()) {
             return Optional.empty();
         }
@@ -82,9 +101,10 @@ public class RuleDialogueEngine {
             return Optional.of(new DialoguePlan(HELP, List.of(), List.of()));
         }
         if (containsAny(text, "重置地图", "恢复默认")) {
-            return Optional.of(new DialoguePlan("已恢复默认图层，并回到安徽省。", List.of(
+            Regions.Region current = Regions.orDefault(regionCode);
+            return Optional.of(new DialoguePlan("已恢复默认图层，并回到" + current.name() + "。", List.of(
                     action("only_layers", DEFAULT_LAYERS, null),
-                    fly(place("安徽省")),
+                    new MapAction("fly_to", null, null, List.of(current.lon(), current.lat()), current.zoom(), current.name(), null),
                     action("clear_markers", null, null)
             ), List.of()));
         }

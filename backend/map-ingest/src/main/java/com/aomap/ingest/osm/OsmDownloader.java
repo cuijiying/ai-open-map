@@ -1,5 +1,6 @@
 package com.aomap.ingest.osm;
 
+import com.aomap.common.geo.Regions.Region;
 import com.aomap.ingest.config.OsmIngestProperties;
 import com.aomap.ingest.service.IngestProgress;
 import org.slf4j.Logger;
@@ -32,20 +33,20 @@ public class OsmDownloader {
                 .build();
     }
 
-    public Path download(OsmIngestProperties properties, OsmIngestProperties.Region region, IngestProgress progress) throws IOException, InterruptedException {
+    public Path download(OsmIngestProperties properties, Region region, IngestProgress progress) throws IOException, InterruptedException {
         Path dir = Path.of(properties.getDataDir());
         Files.createDirectories(dir);
-        Path target = dir.resolve(region.getCode() + "-latest.osm.pbf");
-        String remoteMd5 = fetchText(properties, region.getMd5Url());
+        Path target = dir.resolve(region.code() + "-latest.osm.pbf");
+        String remoteMd5 = fetchText(properties, region.md5Url());
         String expected = remoteMd5 == null ? null : remoteMd5.split("\\s+")[0].trim().toLowerCase();
         if (expected != null && Files.exists(target) && expected.equals(md5(target))) {
             progress.report("DOWNLOAD", 20, "本地文件校验通过，跳过下载");
             return target;
         }
 
-        Path part = dir.resolve(region.getCode() + "-latest.osm.pbf.part");
-        progress.report("DOWNLOAD", 1, "开始下载 " + region.getName() + " OSM 数据");
-        HttpRequest request = HttpRequest.newBuilder(URI.create(region.getUrl()))
+        Path part = dir.resolve(region.code() + "-latest.osm.pbf.part");
+        progress.report("DOWNLOAD", 1, "开始下载 " + region.name() + " OSM 数据");
+        HttpRequest request = HttpRequest.newBuilder(URI.create(region.pbfUrl()))
                 .header("User-Agent", properties.getUserAgent())
                 .GET()
                 .build();

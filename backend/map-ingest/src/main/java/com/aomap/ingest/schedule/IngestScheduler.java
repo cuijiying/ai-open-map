@@ -22,10 +22,10 @@ public class IngestScheduler {
 
     @Scheduled(cron = "${osm.ingest.cron:0 0 3 * * ?}")
     public void nightly() {
-        if (!properties.isScheduleEnabled() || properties.getRegions().isEmpty()) {
+        if (!properties.isScheduleEnabled() || properties.getScheduleRegion() == null || properties.getScheduleRegion().isBlank()) {
             return;
         }
-        String code = properties.getRegions().get(0).getCode();
+        String code = properties.getScheduleRegion();
         try {
             ingestService.start(code, "SCHEDULE");
             log.info("已触发定时入库: {}", code);

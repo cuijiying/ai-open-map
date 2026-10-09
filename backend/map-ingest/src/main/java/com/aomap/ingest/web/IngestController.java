@@ -1,10 +1,10 @@
 package com.aomap.ingest.web;
 
 import com.aomap.common.api.ApiResult;
-import com.aomap.ingest.config.OsmIngestProperties;
 import com.aomap.ingest.model.JobView;
 import com.aomap.ingest.model.LogView;
 import com.aomap.ingest.service.IngestService;
+import com.aomap.ingest.service.IngestService.RegionStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,19 +20,14 @@ import java.util.List;
 public class IngestController {
 
     private final IngestService ingestService;
-    private final OsmIngestProperties properties;
 
-    public IngestController(IngestService ingestService, OsmIngestProperties properties) {
+    public IngestController(IngestService ingestService) {
         this.ingestService = ingestService;
-        this.properties = properties;
     }
 
     @GetMapping("/regions")
-    public ApiResult<List<RegionView>> regions() {
-        List<RegionView> regions = properties.getRegions().stream()
-                .map(region -> new RegionView(region.getCode(), region.getName()))
-                .toList();
-        return ApiResult.ok(regions);
+    public ApiResult<List<RegionStatus>> regions() {
+        return ApiResult.ok(ingestService.regions());
     }
 
     @PostMapping("/jobs")
@@ -62,8 +57,5 @@ public class IngestController {
     }
 
     public record StartRequest(String regionCode) {
-    }
-
-    public record RegionView(String code, String name) {
     }
 }

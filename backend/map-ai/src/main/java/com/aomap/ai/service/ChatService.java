@@ -10,6 +10,7 @@ import com.aomap.common.dto.GeoDtos.LayerCount;
 import com.aomap.common.dto.GeoDtos.SearchHit;
 import com.aomap.common.dto.GeoDtos.StatItem;
 import com.aomap.common.geo.Layers;
+import com.aomap.common.geo.Regions;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
@@ -48,7 +49,7 @@ public class ChatService {
         if (text.isBlank()) {
             throw new IllegalArgumentException("请输入内容");
         }
-        var ruled = rules.plan(text);
+        var ruled = rules.plan(text, regionCode(request));
         if (ruled.isPresent()) {
             return finish(ruled.get(), "rule", request);
         }
@@ -74,7 +75,7 @@ public class ChatService {
     private void apply(FollowUp followUp, ChatRequest request, List<MapAction> actions, List<DataTable> tables, StringBuilder reply) {
         switch (followUp.kind()) {
             case "layers" -> {
-                List<LayerCount> layers = geoApi.layers();
+                List<LayerCount> layers = geoApi.layers(regionCode(request));
                 List<List<Object>> rows = new ArrayList<>();
                 long total = 0;
                 for (LayerCount layer : layers) {
@@ -82,10 +83,10 @@ public class ChatService {
                     total += layer.count();
                 }
                 tables.add(new DataTable("图层数量", List.of("图层", "数量"), rows));
-                reply.append("\n库内共 ").append(total).append(" 条要素。");
+                reply.append("\n").append(Regions.orDefault(regionCode(request)).name()).append("共 ").append(total).append(" 条要素。");
             }
             case "stats" -> {
-                List<StatItem> items = geoApi.stats(followUp.layer());
+                List<StatItem> items = geoApi.stats(regionCode(request), followUp.layer());
                 List<List<Object>> rows = new ArrayList<>();
                 for (StatItem item : items) {
                     rows.add(List.of(item.subtype(), item.count()));
@@ -95,7 +96,7 @@ public class ChatService {
                         .append(items.stream().mapToLong(StatItem::count).sum()).append(" 条。");
             }
             case "search" -> {
-                List<SearchHit> hits = geoApi.search(followUp.keyword(), followUp.layer());
+                List<SearchHit> hits = geoApi.search(regionCode(request), followUp.keyword(), followUp.layer());
                 if (hits.isEmpty()) {
                     reply.append("\n没有找到“").append(followUp.keyword()).append("”。");
                     return;
@@ -114,7 +115,7 @@ public class ChatService {
             }
             case "analyze" -> {
                 double[] bbox = bbox(request);
-                AnalysisResult result = geoApi.analyze(followUp.layer(), bbox[0], bbox[1], bbox[2], bbox[3]);
+                AnalysisResult result = geoApi.analyze(regionCode(request), followUp.layer(), bbox[0], bbox[1], bbox[2], bbox[3]);
                 tables.add(new DataTable("视野统计", List.of("指标", "数值"), List.of(
                         List.of("数量", result.count()),
                         List.of("长度", formatLength(result.lengthMeters())),
@@ -193,6 +194,13 @@ public class ChatService {
         return messages;
     }
 
+    private static String regionCode(ChatRequest request) {
+        if (request == null || request.map() == null || request.map().regionCode() == null || request.map().regionCode().isBlank()) {
+            return "anhui";
+        }
+        return request.map().regionCode();
+    }
+
     private static String lastUserText(ChatRequest request) {
         if (request == null || request.messages() == null) {
             return "";
@@ -241,7 +249,7 @@ public class ChatService {
         public record Message(String role, String content) {
         }
 
-        public record MapContext(List<Double> center, Double zoom, List<Double> bbox, List<String> visibleLayers) {
+        public record MapContext(List<Double> center, Double zoom, List<Double> bbox, List<String> visibleLayers, String regionCode) {
         }
     }
 

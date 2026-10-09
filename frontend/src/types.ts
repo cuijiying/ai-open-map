@@ -1,3 +1,12 @@
+export interface RegionOption {
+  code: string
+  name: string
+  lon: number
+  lat: number
+  zoom: number
+  featureCount: number
+}
+
 export interface LayerCount {
   layer: string
   label: string

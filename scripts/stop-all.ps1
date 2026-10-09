@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 $procs = Get-CimInstance Win32_Process -Filter "Name = 'java.exe'" |
     Where-Object { $_.CommandLine -match "map-(ingest|geo|ai|gateway)-0\.1\.0\.jar" }
 foreach ($proc in $procs) {

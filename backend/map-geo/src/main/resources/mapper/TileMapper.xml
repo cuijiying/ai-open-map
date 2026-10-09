@@ -26,7 +26,8 @@
                    CAST(f.osm_id AS text) AS osm_id
               FROM osm_feature f
               CROSS JOIN bounds b
-             WHERE f.layer = #{layer}
+             WHERE f.region_code = #{region}
+               AND f.layer = #{layer}
                AND f.geom &amp;&amp; b.g4326
             <if test="layer == 'highway'">
                AND (

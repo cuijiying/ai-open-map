@@ -42,11 +42,7 @@ osm:
     schedule-enabled: true
     user-agent: "AIOpenMap/0.1 (local WebGIS)"
     include-buildings: true
-    regions:
-      - code: anhui
-        name: 安徽省
-        url: https://download.geofabrik.de/asia/china/anhui-latest.osm.pbf
-        md5-url: https://download.geofabrik.de/asia/china/anhui-latest.osm.pbf.md5
+    schedule-region: anhui
 
 logging:
   charset:

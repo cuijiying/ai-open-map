@@ -1,6 +1,7 @@
 package com.aomap.ingest.mapper;
 
 import com.aomap.ingest.domain.LayerCountRow;
+import com.aomap.ingest.domain.RegionCountRow;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -15,25 +16,15 @@ public interface FeatureMapper {
 
     int disableStatementTimeout();
 
-    int dropGeomIndex();
+    int deleteRegion(@Param("regionCode") String regionCode);
 
-    int dropLayerIndex();
-
-    int dropNameIndex();
-
-    int truncateFeatures();
-
-    int insertFromStage(@Param("jobId") long jobId);
-
-    int createGeomIndex();
-
-    int createLayerIndex();
-
-    int createNameIndex();
+    int insertFromStage(@Param("jobId") long jobId, @Param("regionCode") String regionCode);
 
     int analyzeFeatures();
 
-    long countFeatures();
+    long countFeatures(@Param("regionCode") String regionCode);
 
-    List<LayerCountRow> countByLayer();
+    List<LayerCountRow> countByLayer(@Param("regionCode") String regionCode);
+
+    List<RegionCountRow> countByRegion();
 }

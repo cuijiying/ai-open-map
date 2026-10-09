@@ -6,5 +6,5 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface TileMapper {
 
-    String mvt(@Param("layer") String layer, @Param("z") int z, @Param("x") int x, @Param("y") int y);
+    String mvt(@Param("region") String region, @Param("layer") String layer, @Param("z") int z, @Param("x") int x, @Param("y") int y);
 }

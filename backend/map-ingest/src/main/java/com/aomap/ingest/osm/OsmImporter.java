@@ -42,7 +42,7 @@ public class OsmImporter {
         this.features = features;
     }
 
-    public long importFile(Path file, long jobId, boolean includeBuildings, IngestProgress progress) throws IOException {
+    public long importFile(Path file, long jobId, String regionCode, boolean includeBuildings, IngestProgress progress) throws IOException {
         features.truncateStage();
         long length = Files.size(file);
         CountingInputStream input = new CountingInputStream(Files.newInputStream(file));
@@ -61,8 +61,8 @@ public class OsmImporter {
             throw new IllegalStateException("没有解析到可入库的要素");
         }
         progress.report("IMPORT", 82, "解析完成，共 " + staged + " 条要素，开始写入正式表");
-        long stored = features.publish(jobId);
-        progress.report("INDEX", 96, "空间索引已建立");
+        long stored = features.publish(jobId, regionCode);
+        progress.report("INDEX", 96, "该省数据已替换，统计信息已更新");
         return stored;
     }
 

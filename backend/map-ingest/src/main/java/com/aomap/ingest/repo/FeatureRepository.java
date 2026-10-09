@@ -1,6 +1,7 @@
 package com.aomap.ingest.repo;
 
 import com.aomap.ingest.domain.LayerCountRow;
+import com.aomap.ingest.domain.RegionCountRow;
 import com.aomap.ingest.mapper.FeatureMapper;
 import org.postgresql.copy.CopyManager;
 import org.postgresql.core.BaseConnection;
@@ -62,24 +63,26 @@ public class FeatureRepository {
     }
 
     @Transactional
-    public long publish(long jobId) {
+    public long publish(long jobId, String regionCode) {
         features.disableStatementTimeout();
-        features.dropGeomIndex();
-        features.dropLayerIndex();
-        features.dropNameIndex();
-        features.truncateFeatures();
-        features.insertFromStage(jobId);
-        features.createGeomIndex();
-        features.createLayerIndex();
-        features.createNameIndex();
+        features.deleteRegion(regionCode);
+        features.insertFromStage(jobId, regionCode);
         features.analyzeFeatures();
-        return features.countFeatures();
+        return features.countFeatures(regionCode);
     }
 
-    public Map<String, Long> countByLayer() {
+    public Map<String, Long> countByLayer(String regionCode) {
         Map<String, Long> counts = new LinkedHashMap<>();
-        for (LayerCountRow row : features.countByLayer()) {
+        for (LayerCountRow row : features.countByLayer(regionCode)) {
             counts.put(row.getLayer(), row.getCount());
+        }
+        return counts;
+    }
+
+    public Map<String, Long> countByRegion() {
+        Map<String, Long> counts = new LinkedHashMap<>();
+        for (RegionCountRow row : features.countByRegion()) {
+            counts.put(row.getRegionCode(), row.getCount() == null ? 0L : row.getCount());
         }
         return counts;
     }

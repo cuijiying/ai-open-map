@@ -6,13 +6,15 @@
     <select id="countByLayer" resultType="com.aomap.geo.domain.NameCount">
         SELECT layer AS name, COUNT(*) AS count
           FROM osm_feature
+         WHERE region_code = #{region}
          GROUP BY layer
     </select>
 
     <select id="stats" resultType="com.aomap.geo.domain.NameCount">
         SELECT sub_type AS name, COUNT(*) AS count
           FROM osm_feature
-         WHERE layer = #{layer}
+         WHERE region_code = #{region}
+           AND layer = #{layer}
          GROUP BY sub_type
          ORDER BY COUNT(*) DESC
          LIMIT 30
@@ -26,7 +28,8 @@
                ST_X(ST_PointOnSurface(geom)) AS lon,
                ST_Y(ST_PointOnSurface(geom)) AS lat
           FROM osm_feature
-         WHERE (
+         WHERE region_code = #{region}
+           AND (
                 name ILIKE #{pattern} ESCAPE '!'
                 OR sub_type ILIKE #{pattern} ESCAPE '!'
                )
@@ -43,7 +46,8 @@
                COALESCE(SUM(ST_Length(CAST(geom AS geography))), 0) AS length_meters,
                COALESCE(SUM(ST_Area(CAST(geom AS geography))), 0) AS area_square_meters
           FROM osm_feature
-         WHERE layer = #{layer}
+         WHERE region_code = #{region}
+           AND layer = #{layer}
            AND geom &amp;&amp; ST_MakeEnvelope(#{minLon}, #{minLat}, #{maxLon}, #{maxLat}, 4326)
     </select>
 </mapper>

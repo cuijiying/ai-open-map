@@ -1,5 +1,7 @@
 package com.aomap.ingest.service;
 
+import com.aomap.common.geo.Regions;
+import com.aomap.common.geo.Regions.Region;
 import com.aomap.ingest.config.OsmIngestProperties;
 import com.aomap.ingest.model.JobView;
 import com.aomap.ingest.model.LogView;
@@ -50,10 +52,25 @@ public class IngestService {
         jobs.failStaleRunning();
     }
 
+    public List<RegionStatus> regions() {
+        Map<String, Long> counts = features.countByRegion();
+        return Regions.ALL.stream()
+                .map(region -> new RegionStatus(
+                        region.code(),
+                        region.name(),
+                        region.lon(),
+                        region.lat(),
+                        region.zoom(),
+                        counts.getOrDefault(region.code(), 0L)
+                ))
+                .toList();
+    }
+
     public JobView start(String regionCode, String triggerType) {
-        OsmIngestProperties.Region region = properties.require(regionCode);
-        long id = jobs.insertRunning(region.getCode(), region.getName(), region.getUrl(), triggerType);
-        jobs.addLog(id, "DOWNLOAD", "INFO", "任务已启动，区域 " + region.getName());
+        String code = regionCode == null || regionCode.isBlank() ? properties.getScheduleRegion() : regionCode;
+        Region region = Regions.require(code);
+        long id = jobs.insertRunning(region.code(), region.name(), region.pbfUrl(), triggerType);
+        jobs.addLog(id, "DOWNLOAD", "INFO", "任务已启动，区域 " + region.name());
         executor.submit(() -> run(id, region));
         return jobs.find(id);
     }
@@ -79,7 +96,7 @@ public class IngestService {
         return jobs.logs(id, afterId);
     }
 
-    private void run(long id, OsmIngestProperties.Region region) {
+    private void run(long id, Region region) {
         int[] logged = {-1};
         String[] phase = {""};
         IngestProgress progress = (nextPhase, percent, message) -> {
@@ -93,9 +110,9 @@ public class IngestService {
         try {
             Path file = downloader.download(properties, region, progress);
             jobs.updateFile(id, file.toAbsolutePath().toString(), Files.size(file));
-            long count = importer.importFile(file, id, properties.isIncludeBuildings(), progress);
-            Map<String, Long> layers = features.countByLayer();
-            String summary = region.getName() + " 数据已入库，共 " + count + " 条要素";
+            long count = importer.importFile(file, id, region.code(), properties.isIncludeBuildings(), progress);
+            Map<String, Long> layers = features.countByLayer(region.code());
+            String summary = region.name() + " 数据已入库，共 " + count + " 条要素";
             jobs.addLog(id, "SUCCESS", "INFO", summary);
             jobs.succeed(id, summary, count, layers);
             log.info(summary);
@@ -114,6 +131,9 @@ public class IngestService {
         }
         String message = current.getMessage();
         return message == null || message.isBlank() ? "任务失败" : message;
+    }
+
+    public record RegionStatus(String code, String name, double lon, double lat, double zoom, long featureCount) {
     }
 
     @PreDestroy

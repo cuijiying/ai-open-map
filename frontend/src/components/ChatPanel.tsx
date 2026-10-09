@@ -8,7 +8,7 @@ interface Props {
   onSend: (text: string) => void
 }
 
-const QUICK = ['显示道路和水系', '定位到合肥', '只显示高速公路', '统计各类数据数量', '查找大学', '分析当前视野内道路里程', '重置地图']
+const QUICK = ['显示道路和水系', '定位到合肥', '定位到杭州', '只显示高速公路', '统计各类数据数量', '查找大学', '分析当前视野内道路里程', '重置地图']
 
 export default function ChatPanel({ messages, loading, onSend }: Props) {
   const [text, setText] = useState('')
@@ -36,7 +36,7 @@ export default function ChatPanel({ messages, loading, onSend }: Props) {
         ))}
       </div>
       <div className="messages">
-        {messages.length === 0 && <div className="hint">可以直接说“定位到合肥”或“只显示高速公路”。未配置模型时使用内置指令。</div>}
+        {messages.length === 0 && <div className="hint">可以直接说“定位到杭州”或“只显示高速公路”。统计和查找只针对当前选择的省份。</div>}
         {messages.map((message, index) => (
           <div key={index} className={`bubble ${message.role}`}>
             <div className="bubble-text">{message.content}</div>

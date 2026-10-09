@@ -20,6 +20,7 @@ body { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; background: #f3f5
 .map-root { position: absolute; inset: 0; }
 .panel, .chat { padding: 12px 14px 8px; }
 .panel-title { display: flex; justify-content: space-between; align-items: center; font-weight: 650; margin-bottom: 8px; }
+.region-select { width: 100%; margin-bottom: 8px; }
 .hint { color: #667085; font-size: 12px; margin-bottom: 8px; }
 .layer-row { display: flex; justify-content: space-between; }
 .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; }

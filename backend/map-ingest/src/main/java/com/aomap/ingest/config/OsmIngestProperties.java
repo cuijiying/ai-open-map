@@ -13,6 +13,7 @@ public class OsmIngestProperties {
     private boolean scheduleEnabled = true;
     private String userAgent = "AIOpenMap/0.1 (local WebGIS)";
     private boolean includeBuildings = true;
+    private String scheduleRegion = "anhui";
     private List<Region> regions = new ArrayList<>();
 
     public String getDataDir() {
@@ -53,6 +54,14 @@ public class OsmIngestProperties {
 
     public void setIncludeBuildings(boolean includeBuildings) {
         this.includeBuildings = includeBuildings;
+    }
+
+    public String getScheduleRegion() {
+        return scheduleRegion;
+    }
+
+    public void setScheduleRegion(String scheduleRegion) {
+        this.scheduleRegion = scheduleRegion;
     }
 
     public List<Region> getRegions() {

@@ -7,7 +7,7 @@ import LayerPanel from './components/LayerPanel'
 import MapView from './components/MapView'
 import ModelModal from './components/ModelModal'
 import { DEFAULT_VISIBLE, LAYERS } from './layers'
-import { ChatMessage, ChatResponse, JobView, LayerCount, LogView, MapAction, MarkerPoint } from './types'
+import { ChatMessage, ChatResponse, JobView, LayerCount, LogView, MapAction, MarkerPoint, RegionOption } from './types'
 
 const { Header, Sider, Content } = Layout
 
@@ -19,6 +19,8 @@ export default function App() {
   const [visible, setVisible] = useState<Record<string, boolean>>(initialVisible)
   const [filters, setFilters] = useState<Record<string, string[] | undefined>>({})
   const [counts, setCounts] = useState<LayerCount[]>([])
+  const [regions, setRegions] = useState<RegionOption[]>([])
+  const [regionCode, setRegionCode] = useState('anhui')
   const [job, setJob] = useState<JobView | null>(null)
   const [logs, setLogs] = useState<LogView[]>([])
   const [starting, setStarting] = useState(false)
@@ -31,49 +33,71 @@ export default function App() {
   const [flyToken, setFlyToken] = useState(0)
   const [bbox, setBbox] = useState<[number, number, number, number]>([114.88, 29.39, 119.65, 34.65])
 
-  const refreshLayers = useCallback(async () => {
-    setCounts(await api<LayerCount[]>('/api/geo/layers'))
+  const refreshLayers = useCallback(async (code: string) => {
+    setCounts(await api<LayerCount[]>(`/api/geo/layers?region=${encodeURIComponent(code)}`))
   }, [])
 
-  const refreshJob = useCallback(async () => {
+  const refreshRegions = useCallback(async () => {
+    const list = await api<RegionOption[]>('/api/ingest/regions')
+    setRegions(list)
+    return list
+  }, [])
+
+  const refreshJob = useCallback(async (code: string) => {
     const latest = await api<JobView | null>('/api/ingest/jobs/latest')
-    setJob(latest)
-    if (latest) {
-      setLogs(await api<LogView[]>(`/api/ingest/jobs/${latest.id}/logs?afterId=0`))
-    }
+    const matched = latest?.status === 'RUNNING'
+      ? latest
+      : (await api<JobView[]>('/api/ingest/jobs?limit=40')).find((item) => item.regionCode === code) ?? null
+    setJob(matched)
+    setLogs(matched ? await api<LogView[]>(`/api/ingest/jobs/${matched.id}/logs?afterId=0`) : [])
     return latest
   }, [])
 
   useEffect(() => {
-    refreshLayers().catch((error: Error) => message.error(error.message))
-    refreshJob().catch((error: Error) => message.error(error.message))
-  }, [refreshLayers, refreshJob])
+    refreshRegions().catch((error: Error) => message.error(error.message))
+    refreshLayers(regionCode).catch((error: Error) => message.error(error.message))
+    refreshJob(regionCode).catch((error: Error) => message.error(error.message))
+  }, [refreshLayers, refreshRegions, refreshJob, regionCode])
 
   useEffect(() => {
     if (job?.status !== 'RUNNING') {
       return
     }
     const timer = window.setInterval(() => {
-      refreshJob()
+      refreshJob(regionCode)
         .then((latest) => {
           if (latest && latest.status !== 'RUNNING') {
-            refreshLayers().catch(() => undefined)
+            refreshRegions().catch(() => undefined)
+            refreshLayers(regionCode).catch(() => undefined)
           }
         })
         .catch(() => undefined)
     }, 2000)
     return () => window.clearInterval(timer)
-  }, [job?.status, refreshJob, refreshLayers])
+  }, [job?.status, regionCode, refreshJob, refreshLayers, refreshRegions])
+
+  function showRegion(code: string) {
+    const region = regions.find((item) => item.code === code)
+    setRegionCode(code)
+    setMarkers([])
+    if (!region) {
+      return
+    }
+    setCenter([region.lon, region.lat])
+    setZoom(region.zoom)
+    setFlyToken((value) => value + 1)
+  }
 
   async function startJob() {
+    const region = regions.find((item) => item.code === regionCode)
     setStarting(true)
     try {
       const created = await api<JobView>('/api/ingest/jobs', {
         method: 'POST',
-        body: JSON.stringify({ regionCode: 'anhui' })
+        body: JSON.stringify({ regionCode })
       })
       setJob(created)
-      message.success('已开始下载安徽省数据')
+      message.success(`已开始下载${region?.name ?? ''}数据`)
     } catch (error) {
       message.error(error instanceof Error ? error.message : '启动失败')
     } finally {
@@ -136,7 +160,7 @@ export default function App() {
         method: 'POST',
         body: JSON.stringify({
           messages: history.map((item) => ({ role: item.role, content: item.content })),
-          map: { center, zoom, bbox, visibleLayers: Object.keys(visible).filter((key) => visible[key]) }
+          map: { center, zoom, bbox, visibleLayers: Object.keys(visible).filter((key) => visible[key]), regionCode }
         })
       })
       applyActions(result.actions ?? [])
@@ -148,7 +172,8 @@ export default function App() {
     }
   }
 
-  const runningLabel = useMemo(() => job?.status === 'RUNNING' ? job.message : '安徽省', [job])
+  const regionName = regions.find((item) => item.code === regionCode)?.name ?? '安徽省'
+  const runningLabel = useMemo(() => job?.status === 'RUNNING' ? job.message : regionName, [job, regionName])
 
   return (
     <Layout className="app">
@@ -165,13 +190,22 @@ export default function App() {
               setFilters((current) => ({ ...current, [layer]: undefined }))
             }
           }} />
-          <JobPanel job={job} logs={logs} loading={starting} onStart={startJob} />
+          <JobPanel
+            regions={regions}
+            regionCode={regionCode}
+            job={job}
+            logs={logs}
+            loading={starting}
+            onRegionChange={showRegion}
+            onStart={startJob}
+          />
         </Sider>
         <Content className="map-content">
           <MapView
             visible={visible}
             filters={filters}
             markers={markers}
+            region={regionCode}
             flyToken={flyToken}
             center={center}
             zoom={zoom}

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import maplibregl, { FilterSpecification, GeoJSONSource, Map } from 'maplibre-gl'
+import maplibregl, { FilterSpecification, GeoJSONSource, Map, VectorTileSource } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { LAYERS, LayerStyle } from '../layers'
 import { MarkerPoint } from '../types'
@@ -8,22 +8,25 @@ interface Props {
   visible: Record<string, boolean>
   filters: Record<string, string[] | undefined>
   markers: MarkerPoint[]
+  region: string
   flyToken: number
   center: [number, number]
   zoom: number
   onBounds: (bbox: [number, number, number, number]) => void
 }
 
-export default function MapView({ visible, filters, markers, flyToken, center, zoom, onBounds }: Props) {
+export default function MapView({ visible, filters, markers, region, flyToken, center, zoom, onBounds }: Props) {
   const container = useRef<HTMLDivElement>(null)
   const mapRef = useRef<Map | null>(null)
   const ready = useRef(false)
   const visibleRef = useRef(visible)
   const filtersRef = useRef(filters)
   const onBoundsRef = useRef(onBounds)
+  const regionRef = useRef(region)
   visibleRef.current = visible
   filtersRef.current = filters
   onBoundsRef.current = onBounds
+  regionRef.current = region
 
   useEffect(() => {
     if (!container.current || mapRef.current) {
@@ -54,7 +57,7 @@ export default function MapView({ visible, filters, markers, flyToken, center, z
       for (const layer of LAYERS) {
         map.addSource(layer.id, {
           type: 'vector',
-          tiles: [`${window.location.origin}/api/tiles/${layer.id}/{z}/{x}/{y}.pbf`],
+          tiles: [tileUrl(regionRef.current, layer.id)],
           minzoom: layer.minzoom,
           maxzoom: 16
         })
@@ -133,6 +136,19 @@ export default function MapView({ visible, filters, markers, flyToken, center, z
       map.setLayoutProperty('place-label', 'visibility', visible.place ? 'visible' : 'none')
     }
   }, [visible, filters])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !ready.current) {
+      return
+    }
+    for (const layer of LAYERS) {
+      const source = map.getSource(layer.id)
+      if (source instanceof VectorTileSource) {
+        source.setTiles([tileUrl(region, layer.id)])
+      }
+    }
+  }, [region])
 
   useEffect(() => {
     const map = mapRef.current
@@ -223,6 +239,10 @@ function applyVisibility(map: Map, visible: Record<string, boolean>, filters: Re
       : null
     map.setFilter(layer.id, filter)
   }
+}
+
+function tileUrl(region: string, layer: string) {
+  return `${window.location.origin}/api/tiles/${layer}/{z}/{x}/{y}.pbf?region=${encodeURIComponent(region)}`
 }
 
 function emptyCollection() {

@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $psql = if ($env:PSQL) { $env:PSQL } else { "C:\Program Files\PostgreSQL\16\bin\psql.exe" }
 if (-not (Test-Path $psql)) {

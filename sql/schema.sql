@@ -70,9 +70,10 @@ CREATE TABLE IF NOT EXISTS osm_feature (
     layer     VARCHAR(32)  NOT NULL,
     sub_type  VARCHAR(64),
     name      TEXT,
-    props     JSONB,
-    geom      geometry(Geometry, 4326) NOT NULL,
-    job_id    BIGINT,
+    props       JSONB,
+    geom        geometry(Geometry, 4326) NOT NULL,
+    region_code VARCHAR(32)  NOT NULL,
+    job_id      BIGINT,
     CONSTRAINT ck_osm_feature_type CHECK (osm_type IN ('node', 'way')),
     CONSTRAINT ck_osm_feature_layer CHECK (layer IN (
         'highway', 'railway', 'waterway', 'water',
@@ -94,6 +95,14 @@ CREATE INDEX IF NOT EXISTS idx_osm_feature_layer
 
 CREATE INDEX IF NOT EXISTS idx_osm_feature_name
     ON osm_feature USING GIN (name gin_trgm_ops);
+
+-- 已有库的表结构不会随 CREATE TABLE IF NOT EXISTS 更新，这里补列并给旧的安徽数据打上区域。
+ALTER TABLE osm_feature ADD COLUMN IF NOT EXISTS region_code VARCHAR(32);
+UPDATE osm_feature SET region_code = 'anhui' WHERE region_code IS NULL;
+ALTER TABLE osm_feature ALTER COLUMN region_code SET NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_osm_feature_region
+    ON osm_feature (region_code, layer);
+COMMENT ON COLUMN osm_feature.region_code IS '省级区域代码，与 Geofabrik 文件名一致，例如 anhui、zhejiang';
 
 -- 入库缓冲表。解析阶段只写这里，成功后再替换正式表，避免半成品被地图读到。
 CREATE UNLOGGED TABLE IF NOT EXISTS osm_feature_stage (
