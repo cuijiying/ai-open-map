@@ -20,6 +20,7 @@ public class RuleDialogueEngine {
             · 统计道路数量，或查找大学
             · 分析当前视野内的道路里程
             · 重置地图
+            · 切换深色、影像、纸图或素底风格，也可以把道路改成红色
             配置 OpenAI 兼容模型后，也可以用自己的话提问。""";
 
     private static final List<String> DEFAULT_LAYERS = List.of("highway", "waterway", "water", "place", "boundary");
@@ -99,6 +100,10 @@ public class RuleDialogueEngine {
         String text = raw.trim().toLowerCase(Locale.ROOT);
         if (containsAny(text, "帮助", "你能做什么", "怎么用", "有哪些指令")) {
             return Optional.of(new DialoguePlan(HELP, List.of(), List.of()));
+        }
+        Optional<DialoguePlan> style = stylePlan(text);
+        if (style.isPresent()) {
+            return style;
         }
         if (containsAny(text, "重置地图", "恢复默认")) {
             Regions.Region current = Regions.orDefault(regionCode);
@@ -213,6 +218,99 @@ public class RuleDialogueEngine {
         return new DialoguePlan("已定位到" + place.name() + extra + "。", actions, List.of());
     }
 
+    private Optional<DialoguePlan> stylePlan(String text) {
+        String theme = themeId(text);
+        if (theme != null && containsAny(text, "风格", "样式", "主题", "底图", "配色", "切换", "换成", "改成", "改为", "调成", "打开", "显示", "使用", "地图")) {
+            return Optional.of(new DialoguePlan("已切换为" + themeLabel(theme) + "。", List.of(
+                    new MapAction("set_style", null, null, null, null, theme, null)
+            ), List.of()));
+        }
+        if (containsAny(text, "风格", "样式", "主题", "配色") && containsAny(text, "默认", "重置", "恢复")) {
+            return Optional.of(new DialoguePlan("已恢复浅色风格。", List.of(
+                    new MapAction("set_style", null, null, null, null, "reset", null)
+            ), List.of()));
+        }
+        if (containsAny(text, "改成", "换成", "改为", "调成", "设为", "变成")) {
+            String color = colorOf(text);
+            LayerMatch layers = findLayers(text);
+            if (color != null && !layers.layers().isEmpty()) {
+                return Optional.of(new DialoguePlan("已把" + labels(layers.layers()) + "调整为指定颜色。", List.of(
+                        new MapAction("paint_layer", layers.layers(), layers.filters().isEmpty() ? null : layers.filters(), null, null, color, null)
+                ), List.of()));
+            }
+        }
+        return Optional.empty();
+    }
+
+    private static String themeId(String text) {
+        if (containsAny(text, "卫星", "影像", "航拍")) {
+            return "imagery";
+        }
+        if (containsAny(text, "纸图", "复古")) {
+            return "paper";
+        }
+        if (containsAny(text, "素底", "素净", "无底图")) {
+            return "plain";
+        }
+        if (containsAny(text, "深色", "黑夜", "夜间", "暗色")) {
+            return "dark";
+        }
+        if (containsAny(text, "彩色", "航行")) {
+            return "voyager";
+        }
+        if (containsAny(text, "浅色", "亮色")) {
+            return "light";
+        }
+        return null;
+    }
+
+    private static String themeLabel(String theme) {
+        return switch (theme) {
+            case "dark" -> "深色风格";
+            case "voyager" -> "彩色风格";
+            case "paper" -> "纸图风格";
+            case "imagery" -> "影像风格";
+            case "plain" -> "素底风格";
+            default -> "浅色风格";
+        };
+    }
+
+    private static String colorOf(String text) {
+        List<ColorWord> words = List.of(
+                new ColorWord("深红", "#991b1b"),
+                new ColorWord("红色", "#dc2626"),
+                new ColorWord("橙色", "#ea580c"),
+                new ColorWord("黄色", "#ca8a04"),
+                new ColorWord("绿色", "#16a34a"),
+                new ColorWord("青色", "#0891b2"),
+                new ColorWord("蓝色", "#2563eb"),
+                new ColorWord("紫色", "#7c3aed"),
+                new ColorWord("粉色", "#db2777"),
+                new ColorWord("棕色", "#92400e"),
+                new ColorWord("灰色", "#6b7280"),
+                new ColorWord("黑色", "#111827"),
+                new ColorWord("白色", "#f8fafc"),
+                new ColorWord("红", "#dc2626"),
+                new ColorWord("橙", "#ea580c"),
+                new ColorWord("黄", "#ca8a04"),
+                new ColorWord("绿", "#16a34a"),
+                new ColorWord("青", "#0891b2"),
+                new ColorWord("蓝", "#2563eb"),
+                new ColorWord("紫", "#7c3aed"),
+                new ColorWord("粉", "#db2777"),
+                new ColorWord("棕", "#92400e"),
+                new ColorWord("灰", "#6b7280"),
+                new ColorWord("黑", "#111827"),
+                new ColorWord("白", "#f8fafc")
+        );
+        return words.stream()
+                .sorted((a, b) -> Integer.compare(b.word().length(), a.word().length()))
+                .filter(item -> text.contains(item.word()))
+                .map(ColorWord::hex)
+                .findFirst()
+                .orElse(null);
+    }
+
     private static MapAction action(String type, List<String> layers, Map<String, List<String>> filters) {
         return new MapAction(type, layers, filters == null || filters.isEmpty() ? null : filters, null, null, null, null);
     }
@@ -306,5 +404,8 @@ public class RuleDialogueEngine {
     }
 
     private record LayerMatch(List<String> layers, Map<String, List<String>> filters) {
+    }
+
+    private record ColorWord(String word, String hex) {
     }
 }
