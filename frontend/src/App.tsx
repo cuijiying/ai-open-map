@@ -6,7 +6,9 @@ import JobPanel from './components/JobPanel'
 import LayerPanel from './components/LayerPanel'
 import MapView from './components/MapView'
 import ModelModal from './components/ModelModal'
+import StylePanel from './components/StylePanel'
 import { DEFAULT_VISIBLE, LAYERS } from './layers'
+import { emptyOverrides, isThemeId, loadMapStyle, loadThemeOverrides, paintLayers, resetStoredStyles, resolveStyle, saveMapStyle, swatchOf, ThemeId } from './mapStyle'
 import { ChatMessage, ChatResponse, JobView, LayerCount, LogView, MapAction, MarkerPoint, RegionOption } from './types'
 
 const { Header, Sider, Content } = Layout
@@ -32,6 +34,13 @@ export default function App() {
   const [zoom, setZoom] = useState(6.4)
   const [flyToken, setFlyToken] = useState(0)
   const [bbox, setBbox] = useState<[number, number, number, number]>([114.88, 29.39, 119.65, 34.65])
+  const [themeId, setThemeId] = useState<ThemeId>(() => loadMapStyle().themeId)
+  const [styleOverrides, setStyleOverrides] = useState(() => loadMapStyle().overrides)
+  const mapStyle = useMemo(() => resolveStyle(themeId, styleOverrides), [themeId, styleOverrides])
+  const swatches = useMemo(
+    () => Object.fromEntries(LAYERS.map((layer) => [layer.id, swatchOf(mapStyle, layer.id)])),
+    [mapStyle]
+  )
 
   const refreshLayers = useCallback(async (code: string) => {
     setCounts(await api<LayerCount[]>(`/api/geo/layers?region=${encodeURIComponent(code)}`))
@@ -52,6 +61,15 @@ export default function App() {
     setLogs(matched ? await api<LogView[]>(`/api/ingest/jobs/${matched.id}/logs?afterId=0`) : [])
     return latest
   }, [])
+
+  useEffect(() => {
+    saveMapStyle(themeId, styleOverrides)
+  }, [themeId, styleOverrides])
+
+  function chooseTheme(id: ThemeId) {
+    setThemeId(id)
+    setStyleOverrides(loadThemeOverrides(id))
+  }
 
   useEffect(() => {
     refreshRegions().catch((error: Error) => message.error(error.message))
@@ -148,6 +166,21 @@ export default function App() {
       if (action.type === 'clear_markers') {
         setMarkers([])
       }
+      if (action.type === 'set_style' && action.label === 'reset') {
+        resetStoredStyles()
+        setThemeId('light')
+        setStyleOverrides(emptyOverrides())
+      } else if (action.type === 'set_style' && isThemeId(action.label)) {
+        const nextTheme = action.label
+        setThemeId(nextTheme)
+        setStyleOverrides(loadThemeOverrides(nextTheme))
+      }
+      if (action.type === 'paint_layer' && action.label && action.layers && action.layers.length > 0) {
+        const layers = action.layers
+        const color = action.label
+        const actionFilters = action.filters
+        setStyleOverrides((current) => paintLayers(current, layers, color, actionFilters))
+      }
     }
   }
 
@@ -184,7 +217,18 @@ export default function App() {
       </Header>
       <Layout className="body">
         <Sider width={320} theme="light" className="side">
-          <LayerPanel counts={counts} visible={visible} onToggle={(layer, checked) => {
+          <StylePanel
+            themeId={themeId}
+            overrides={styleOverrides}
+            resolvedTokens={mapStyle.tokens}
+            resolvedOpacity={mapStyle.numbers}
+            widthScale={mapStyle.widthScale}
+            labels={mapStyle.labels}
+            basemap={mapStyle.basemap}
+            onTheme={chooseTheme}
+            onOverrides={setStyleOverrides}
+          />
+          <LayerPanel counts={counts} visible={visible} swatches={swatches} onToggle={(layer, checked) => {
             setVisible((current) => ({ ...current, [layer]: checked }))
             if (checked) {
               setFilters((current) => ({ ...current, [layer]: undefined }))
@@ -209,6 +253,7 @@ export default function App() {
             flyToken={flyToken}
             center={center}
             zoom={zoom}
+            style={mapStyle}
             onBounds={(bbox) => setBbox(bbox)}
           />
         </Content>
