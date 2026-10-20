@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'react'
-import maplibregl, { FilterSpecification, GeoJSONSource, Map, VectorTileSource } from 'maplibre-gl'
+import maplibregl, { GeoJSONSource, Map, VectorTileSource } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { LAYERS, LayerStyle } from '../layers'
+import { LAYERS } from '../layers'
+import { applyLayerState, interactiveLayerIds, overlayLayers, rememberBasemap, syncOverlayStyle } from '../mapPaint'
+import { attributionOf, featureCaption, maxzoomOf, ResolvedStyle, tilesOf } from '../mapStyle'
 import { MarkerPoint } from '../types'
 
 interface Props {
@@ -12,10 +14,11 @@ interface Props {
   flyToken: number
   center: [number, number]
   zoom: number
+  style: ResolvedStyle
   onBounds: (bbox: [number, number, number, number]) => void
 }
 
-export default function MapView({ visible, filters, markers, region, flyToken, center, zoom, onBounds }: Props) {
+export default function MapView({ visible, filters, markers, region, flyToken, center, zoom, style, onBounds }: Props) {
   const container = useRef<HTMLDivElement>(null)
   const mapRef = useRef<Map | null>(null)
   const ready = useRef(false)
@@ -23,19 +26,24 @@ export default function MapView({ visible, filters, markers, region, flyToken, c
   const filtersRef = useRef(filters)
   const onBoundsRef = useRef(onBounds)
   const regionRef = useRef(region)
+  const styleRef = useRef(style)
   visibleRef.current = visible
   filtersRef.current = filters
   onBoundsRef.current = onBounds
   regionRef.current = region
+  styleRef.current = style
 
   useEffect(() => {
     if (!container.current || mapRef.current) {
       return
     }
+    const initial = styleRef.current
+    const basemap = initial.basemap === 'none' ? 'light' : initial.basemap
     const map = new maplibregl.Map({
       container: container.current,
       center: [117.28, 31.86],
       zoom: 6.4,
+      attributionControl: false,
       localIdeographFontFamily: "'Microsoft YaHei', 'PingFang SC', sans-serif",
       style: {
         version: 8,
@@ -43,14 +51,23 @@ export default function MapView({ visible, filters, markers, region, flyToken, c
         sources: {
           basemap: {
             type: 'raster',
-            tiles: ['https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png'],
+            tiles: tilesOf(basemap),
             tileSize: 256,
-            attribution: '© OpenStreetMap © CARTO'
+            maxzoom: maxzoomOf(basemap)
           }
         },
-        layers: [{ id: 'basemap', type: 'raster', source: 'basemap' }]
+        layers: [
+          { id: 'background', type: 'background', paint: { 'background-color': initial.tokens.background } },
+          {
+            id: 'basemap',
+            type: 'raster',
+            source: 'basemap',
+            layout: { visibility: initial.basemap === 'none' ? 'none' : 'visible' }
+          }
+        ]
       }
     })
+    rememberBasemap(map, initial.basemap)
     map.addControl(new maplibregl.NavigationControl(), 'top-right')
     map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left')
     map.on('load', () => {
@@ -61,28 +78,9 @@ export default function MapView({ visible, filters, markers, region, flyToken, c
           minzoom: layer.minzoom,
           maxzoom: 16
         })
-        map.addLayer(paintLayer(layer))
-        if (layer.id === 'place') {
-          map.addLayer({
-            id: 'place-label',
-            type: 'symbol',
-            source: 'place',
-            'source-layer': 'place',
-            minzoom: 5,
-            layout: {
-              'text-field': ['get', 'name'],
-              'text-font': ['Open Sans Regular'],
-              'text-size': 13,
-              'text-offset': [0, 0.8],
-              'text-anchor': 'top'
-            },
-            paint: {
-              'text-color': '#1f2937',
-              'text-halo-color': '#ffffff',
-              'text-halo-width': 1.2
-            }
-          })
-        }
+      }
+      for (const spec of overlayLayers(styleRef.current)) {
+        map.addLayer(spec)
       }
       map.addSource('markers', { type: 'geojson', data: emptyCollection() })
       map.addLayer({
@@ -91,30 +89,40 @@ export default function MapView({ visible, filters, markers, region, flyToken, c
         source: 'markers',
         paint: {
           'circle-radius': 7,
-          'circle-color': '#111827',
+          'circle-color': styleRef.current.tokens.marker,
           'circle-stroke-width': 2,
-          'circle-stroke-color': '#ffffff'
+          'circle-stroke-color': styleRef.current.tokens.markerStroke
         }
       })
       ready.current = true
-      applyVisibility(map, visibleRef.current, filtersRef.current)
+      syncOverlayStyle(map, styleRef.current)
+      applyLayerState(map, visibleRef.current, filtersRef.current, styleRef.current.labels)
+      for (const id of [...interactiveLayerIds(), 'markers']) {
+        map.on('mouseenter', id, () => {
+          map.getCanvas().style.cursor = 'pointer'
+        })
+        map.on('mouseleave', id, () => {
+          map.getCanvas().style.cursor = ''
+        })
+      }
     })
     map.on('moveend', () => {
       const box = map.getBounds()
       onBoundsRef.current([box.getWest(), box.getSouth(), box.getEast(), box.getNorth()])
     })
     map.on('click', (event) => {
-      const features = map.queryRenderedFeatures(event.point).filter((feature) => feature.source !== 'basemap')
+      const features = map.queryRenderedFeatures(event.point).filter((feature) => feature.source !== 'basemap' && feature.layer?.id !== 'background')
       if (features.length === 0) {
         return
       }
       const feature = features[0]
       const props = feature.properties ?? {}
-      const name = props.name || '未命名'
-      const subtype = props.subtype || ''
+      const source = String(feature.sourceLayer || feature.source || '')
+      const name = String(props.name || '未命名')
+      const caption = featureCaption(source, String(props.subtype || ''))
       new maplibregl.Popup({ closeButton: true, maxWidth: '280px' })
         .setLngLat(event.lngLat)
-        .setHTML(`<strong>${escapeHtml(String(name))}</strong><br/>${escapeHtml(String(feature.sourceLayer || feature.source))} ${escapeHtml(String(subtype))}`)
+        .setHTML(`<div class="map-popup"><div class="map-popup-name">${escapeHtml(name)}</div><div class="map-popup-meta">${escapeHtml(caption)}</div></div>`)
         .addTo(map)
     })
     mapRef.current = map
@@ -130,11 +138,16 @@ export default function MapView({ visible, filters, markers, region, flyToken, c
     if (!map || !ready.current) {
       return
     }
-    applyVisibility(map, visible, filters)
-    const label = map.getLayer('place-label')
-    if (label) {
-      map.setLayoutProperty('place-label', 'visibility', visible.place ? 'visible' : 'none')
+    syncOverlayStyle(map, style)
+    applyLayerState(map, visibleRef.current, filtersRef.current, style.labels)
+  }, [style])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !ready.current) {
+      return
     }
+    applyLayerState(map, visible, filters, styleRef.current.labels)
   }, [visible, filters])
 
   useEffect(() => {
@@ -174,71 +187,12 @@ export default function MapView({ visible, filters, markers, region, flyToken, c
     })
   }, [markers])
 
-  return <div ref={container} className="map-root" />
-}
-
-function paintLayer(layer: LayerStyle): maplibregl.LayerSpecification {
-  const layout = { visibility: 'visible' as const }
-  if (layer.kind === 'fill') {
-    return {
-      id: layer.id,
-      type: 'fill',
-      source: layer.id,
-      'source-layer': layer.id,
-      minzoom: layer.minzoom,
-      layout,
-      paint: {
-        'fill-color': layer.color,
-        'fill-opacity': layer.id === 'building' ? 0.85 : 0.55,
-        'fill-outline-color': '#ffffff'
-      }
-    }
-  }
-  if (layer.kind === 'circle') {
-    return {
-      id: layer.id,
-      type: 'circle',
-      source: layer.id,
-      'source-layer': layer.id,
-      minzoom: layer.minzoom,
-      layout,
-      paint: {
-        'circle-radius': layer.id === 'place' ? 4 : 5,
-        'circle-color': layer.color,
-        'circle-stroke-width': 1,
-        'circle-stroke-color': '#ffffff'
-      }
-    }
-  }
-  return {
-    id: layer.id,
-    type: 'line',
-    source: layer.id,
-    'source-layer': layer.id,
-    minzoom: layer.minzoom,
-    layout: { ...layout, 'line-cap': 'round', 'line-join': 'round' },
-    paint: {
-      'line-color': layer.id === 'highway'
-        ? ['match', ['get', 'subtype'], 'motorway', '#c0392b', 'motorway_link', '#c0392b', 'trunk', '#e67e22', 'trunk_link', '#e67e22', 'primary', '#d4a017', 'primary_link', '#d4a017', '#f0b429']
-        : layer.color,
-      'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.6, 10, 1.6, 14, 3.2],
-      ...(layer.id === 'boundary' ? { 'line-dasharray': [2, 1.5] as [number, number] } : {})
-    }
-  }
-}
-
-function applyVisibility(map: Map, visible: Record<string, boolean>, filters: Record<string, string[] | undefined>) {
-  for (const layer of LAYERS) {
-    if (!map.getLayer(layer.id)) {
-      continue
-    }
-    map.setLayoutProperty(layer.id, 'visibility', visible[layer.id] ? 'visible' : 'none')
-    const subtypes = filters[layer.id]
-    const filter: FilterSpecification | null = subtypes && subtypes.length > 0
-      ? ['in', ['get', 'subtype'], ['literal', subtypes]]
-      : null
-    map.setFilter(layer.id, filter)
-  }
+  return (
+    <div className="map-root">
+      <div ref={container} className="map-canvas" />
+      <div className="map-attrib">{attributionOf(style.basemap)}</div>
+    </div>
+  )
 }
 
 function tileUrl(region: string, layer: string) {

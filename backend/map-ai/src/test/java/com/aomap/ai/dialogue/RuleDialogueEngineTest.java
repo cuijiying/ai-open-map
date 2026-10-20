@@ -49,6 +49,25 @@ class RuleDialogueEngineTest {
     }
 
     @Test
+    void switchesStyleAndRecolorsRoads() {
+        DialoguePlan dark = engine.plan("切换深色风格").orElseThrow();
+        assertEquals("set_style", dark.actions().get(0).type());
+        assertEquals("dark", dark.actions().get(0).label());
+        DialoguePlan imagery = engine.plan("切换影像风格").orElseThrow();
+        assertEquals("imagery", imagery.actions().get(0).label());
+        DialoguePlan color = engine.plan("把道路改成红色").orElseThrow();
+        assertEquals("paint_layer", color.actions().get(0).type());
+        assertEquals("highway", color.actions().get(0).layers().get(0));
+        assertEquals("#dc2626", color.actions().get(0).label());
+        DialoguePlan motorway = engine.plan("把高速公路改成蓝色").orElseThrow();
+        assertTrue(motorway.actions().get(0).filters().get("highway").contains("motorway"));
+        assertEquals("#2563eb", motorway.actions().get(0).label());
+        DialoguePlan reset = engine.plan("恢复默认样式").orElseThrow();
+        assertEquals("reset", reset.actions().get(0).label());
+        assertTrue(engine.plan("显示道路").orElseThrow().actions().stream().noneMatch(action -> "set_style".equals(action.type())));
+    }
+
+    @Test
     void helpAndUnknown() {
         assertTrue(engine.plan("你能做什么").orElseThrow().reply().contains("显示道路"));
         assertTrue(engine.plan("今天天气怎么样").isEmpty());

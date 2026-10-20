@@ -5,10 +5,11 @@ import { LayerCount } from '../types'
 interface Props {
   counts: LayerCount[]
   visible: Record<string, boolean>
+  swatches: Record<string, string>
   onToggle: (layer: string, checked: boolean) => void
 }
 
-export default function LayerPanel({ counts, visible, onToggle }: Props) {
+export default function LayerPanel({ counts, visible, swatches, onToggle }: Props) {
   const countOf = (id: string) => counts.find((item) => item.layer === id)?.count ?? 0
   return (
     <section className="panel">
@@ -19,7 +20,7 @@ export default function LayerPanel({ counts, visible, onToggle }: Props) {
         renderItem={(layer) => (
           <List.Item className="layer-row">
             <Checkbox checked={!!visible[layer.id]} onChange={(event) => onToggle(layer.id, event.target.checked)}>
-              <i className="swatch" style={{ background: layer.color }} />
+              <i className="swatch" style={{ background: swatches[layer.id] || layer.color }} />
               {layer.label}
             </Checkbox>
             <span className="count">{countOf(layer.id).toLocaleString('zh-CN')}</span>
