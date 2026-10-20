@@ -3,6 +3,8 @@ package com.aomap.ingest.web;
 import com.aomap.common.api.ApiResult;
 import com.aomap.ingest.model.JobView;
 import com.aomap.ingest.model.LogView;
+import com.aomap.ingest.model.SourceOption;
+import com.aomap.ingest.model.SourceProbe;
 import com.aomap.ingest.service.IngestService;
 import com.aomap.ingest.service.IngestService.RegionStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,10 +32,23 @@ public class IngestController {
         return ApiResult.ok(ingestService.regions());
     }
 
+    @GetMapping("/sources")
+    public ApiResult<List<SourceOption>> sources(@RequestParam(defaultValue = "anhui") String region) {
+        return ApiResult.ok(ingestService.sources(region));
+    }
+
+    @PostMapping("/sources/test")
+    public ApiResult<SourceProbe> test(@RequestBody TestRequest request) {
+        String regionCode = request == null ? null : request.regionCode();
+        String sourceId = request == null ? null : request.sourceId();
+        return ApiResult.ok(ingestService.testSource(regionCode, sourceId));
+    }
+
     @PostMapping("/jobs")
     public ApiResult<JobView> start(@RequestBody(required = false) StartRequest request) {
         String regionCode = request == null ? null : request.regionCode();
-        return ApiResult.ok(ingestService.start(regionCode, "MANUAL"));
+        String sourceId = request == null ? null : request.sourceId();
+        return ApiResult.ok(ingestService.start(regionCode, sourceId, "MANUAL"));
     }
 
     @GetMapping("/jobs")
@@ -56,6 +71,9 @@ public class IngestController {
         return ApiResult.ok(ingestService.logs(id, afterId));
     }
 
-    public record StartRequest(String regionCode) {
+    public record StartRequest(String regionCode, String sourceId) {
+    }
+
+    public record TestRequest(String regionCode, String sourceId) {
     }
 }

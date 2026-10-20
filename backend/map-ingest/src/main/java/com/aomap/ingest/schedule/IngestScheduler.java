@@ -1,6 +1,7 @@
 package com.aomap.ingest.schedule;
 
 import com.aomap.ingest.config.OsmIngestProperties;
+import com.aomap.ingest.osm.OsmMirrors;
 import com.aomap.ingest.service.IngestService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,7 +28,7 @@ public class IngestScheduler {
         }
         String code = properties.getScheduleRegion();
         try {
-            ingestService.start(code, "SCHEDULE");
+            ingestService.start(code, OsmMirrors.AUTO, "SCHEDULE");
             log.info("已触发定时入库: {}", code);
         } catch (IllegalStateException ex) {
             log.info("跳过定时入库: {}", ex.getMessage());

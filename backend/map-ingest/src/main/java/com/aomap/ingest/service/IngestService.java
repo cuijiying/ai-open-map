@@ -5,8 +5,12 @@ import com.aomap.common.geo.Regions.Region;
 import com.aomap.ingest.config.OsmIngestProperties;
 import com.aomap.ingest.model.JobView;
 import com.aomap.ingest.model.LogView;
+import com.aomap.ingest.model.SourceOption;
+import com.aomap.ingest.model.SourceProbe;
 import com.aomap.ingest.osm.OsmDownloader;
 import com.aomap.ingest.osm.OsmImporter;
+import com.aomap.ingest.osm.OsmMirrors;
+import com.aomap.ingest.osm.OsmMirrors.Source;
 import com.aomap.ingest.repo.FeatureRepository;
 import com.aomap.ingest.repo.JobRepository;
 import jakarta.annotation.PreDestroy;
@@ -66,12 +70,27 @@ public class IngestService {
                 .toList();
     }
 
-    public JobView start(String regionCode, String triggerType) {
+    public List<SourceOption> sources(String regionCode) {
+        Region region = Regions.require(regionCode);
+        return OsmMirrors.sources(region).stream()
+                .map(source -> new SourceOption(source.id(), source.name(), source.pbfUrl(), noteOf(source.id())))
+                .toList();
+    }
+
+    public SourceProbe testSource(String regionCode, String sourceId) {
+        Region region = Regions.require(regionCode);
+        Source source = OsmMirrors.require(region, sourceId);
+        return downloader.probe(properties, source);
+    }
+
+    public JobView start(String regionCode, String sourceId, String triggerType) {
         String code = regionCode == null || regionCode.isBlank() ? properties.getScheduleRegion() : regionCode;
         Region region = Regions.require(code);
-        long id = jobs.insertRunning(region.code(), region.name(), region.pbfUrl(), triggerType);
-        jobs.addLog(id, "DOWNLOAD", "INFO", "任务已启动，区域 " + region.name());
-        executor.submit(() -> run(id, region));
+        List<Source> plan = OsmMirrors.resolve(region, sourceId);
+        long id = jobs.insertRunning(region.code(), region.name(), plan.get(0).pbfUrl(), triggerType);
+        String label = plan.size() == 1 ? plan.get(0).name() : "自动（优先 " + plan.get(0).name() + "）";
+        jobs.addLog(id, "DOWNLOAD", "INFO", "任务已启动，区域 " + region.name() + "，下载源 " + label);
+        executor.submit(() -> run(id, region, sourceId));
         return jobs.find(id);
     }
 
@@ -96,7 +115,7 @@ public class IngestService {
         return jobs.logs(id, afterId);
     }
 
-    private void run(long id, Region region) {
+    private void run(long id, Region region, String sourceId) {
         int[] logged = {-1};
         String[] phase = {""};
         IngestProgress progress = (nextPhase, percent, message) -> {
@@ -108,7 +127,7 @@ public class IngestService {
             }
         };
         try {
-            Path file = downloader.download(properties, region, progress);
+            Path file = downloader.download(properties, region, sourceId, progress, source -> jobs.updateSource(id, source.pbfUrl()));
             jobs.updateFile(id, file.toAbsolutePath().toString(), Files.size(file));
             long count = importer.importFile(file, id, region.code(), properties.isIncludeBuildings(), progress);
             Map<String, Long> layers = features.countByLayer(region.code());
@@ -134,6 +153,16 @@ public class IngestService {
     }
 
     public record RegionStatus(String code, String name, double lon, double lat, double zoom, long featureCount) {
+    }
+
+    private static String noteOf(String sourceId) {
+        if (OsmMirrors.FRANCE.equals(sourceId)) {
+            return "国内网络通常可直连";
+        }
+        if (OsmMirrors.GEOFABRIK.equals(sourceId)) {
+            return "官方每日更新，国内可能超时";
+        }
+        return "";
     }
 
     @PreDestroy

@@ -57,6 +57,10 @@ public class JobRepository {
         jobs.updateFile(id, path, bytes);
     }
 
+    public void updateSource(long id, String sourceUrl) {
+        jobs.updateSource(id, sourceUrl);
+    }
+
     public void succeed(long id, String message, long featureCount, Map<String, Long> layerCounts) {
         jobs.succeed(id, message, featureCount, toJson(layerCounts));
     }

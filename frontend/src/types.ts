@@ -21,6 +21,7 @@ export interface JobView {
   phase: string
   progress: number
   message?: string
+  sourceUrl?: string
   fileBytes?: number
   featureCount?: number
   layerCounts?: Record<string, number>
@@ -28,6 +29,35 @@ export interface JobView {
   startedAt?: string
   finishedAt?: string
   error?: string
+}
+
+export interface SourceOption {
+  id: string
+  name: string
+  url: string
+  note?: string
+}
+
+export interface SourceProbe {
+  id: string
+  name: string
+  url: string
+  ok: boolean
+  elapsedMs: number
+  message: string
+}
+
+export function sourceLabel(url?: string) {
+  if (!url) {
+    return ''
+  }
+  if (url.includes('openstreetmap.fr')) {
+    return 'OSM France'
+  }
+  if (url.includes('geofabrik.de')) {
+    return 'Geofabrik'
+  }
+  return '其他源'
 }
 
 export interface LogView {

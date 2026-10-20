@@ -20,6 +20,8 @@ public interface IngestJobMapper {
 
     int updateFile(@Param("id") long id, @Param("path") String path, @Param("bytes") long bytes);
 
+    int updateSource(@Param("id") long id, @Param("sourceUrl") String sourceUrl);
+
     int succeed(@Param("id") long id, @Param("message") String message,
                 @Param("featureCount") long featureCount, @Param("layerCounts") String layerCounts);
 

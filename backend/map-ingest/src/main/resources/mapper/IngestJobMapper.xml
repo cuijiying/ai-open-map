@@ -42,6 +42,12 @@
          WHERE id = #{id}
     </update>
 
+    <update id="updateSource">
+        UPDATE ingest_job
+           SET source_url = #{sourceUrl}
+         WHERE id = #{id}
+    </update>
+
     <update id="succeed">
         UPDATE ingest_job
            SET status = 'SUCCESS',

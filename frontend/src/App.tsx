@@ -9,7 +9,14 @@ import ModelModal from './components/ModelModal'
 import StylePanel from './components/StylePanel'
 import { DEFAULT_VISIBLE, LAYERS } from './layers'
 import { emptyOverrides, isThemeId, loadMapStyle, loadThemeOverrides, paintLayers, resetStoredStyles, resolveStyle, saveMapStyle, swatchOf, ThemeId } from './mapStyle'
-import { ChatMessage, ChatResponse, JobView, LayerCount, LogView, MapAction, MarkerPoint, RegionOption } from './types'
+import { ChatMessage, ChatResponse, JobView, LayerCount, LogView, MapAction, MarkerPoint, RegionOption, SourceOption, SourceProbe } from './types'
+
+const SOURCE_KEY = 'aomap.downloadSource'
+
+function loadSourceId() {
+  const saved = localStorage.getItem(SOURCE_KEY)
+  return saved === 'geofabrik' || saved === 'osm-france' ? saved : 'osm-france'
+}
 
 const { Header, Sider, Content } = Layout
 
@@ -23,6 +30,10 @@ export default function App() {
   const [counts, setCounts] = useState<LayerCount[]>([])
   const [regions, setRegions] = useState<RegionOption[]>([])
   const [regionCode, setRegionCode] = useState('anhui')
+  const [sources, setSources] = useState<SourceOption[]>([])
+  const [sourceId, setSourceId] = useState(loadSourceId)
+  const [probe, setProbe] = useState<SourceProbe | null>(null)
+  const [probing, setProbing] = useState(false)
   const [job, setJob] = useState<JobView | null>(null)
   const [logs, setLogs] = useState<LogView[]>([])
   const [starting, setStarting] = useState(false)
@@ -52,6 +63,14 @@ export default function App() {
     return list
   }, [])
 
+  const refreshSources = useCallback(async (code: string) => {
+    setProbe(null)
+    const list = await api<SourceOption[]>(`/api/ingest/sources?region=${encodeURIComponent(code)}`)
+    setSources(list)
+    setSourceId((current) => list.some((item) => item.id === current) ? current : (list[0]?.id ?? current))
+    return list
+  }, [])
+
   const refreshJob = useCallback(async (code: string) => {
     const latest = await api<JobView | null>('/api/ingest/jobs/latest')
     const matched = latest?.status === 'RUNNING'
@@ -73,9 +92,10 @@ export default function App() {
 
   useEffect(() => {
     refreshRegions().catch((error: Error) => message.error(error.message))
+    refreshSources(regionCode).catch((error: Error) => message.error(error.message))
     refreshLayers(regionCode).catch((error: Error) => message.error(error.message))
     refreshJob(regionCode).catch((error: Error) => message.error(error.message))
-  }, [refreshLayers, refreshRegions, refreshJob, regionCode])
+  }, [refreshLayers, refreshRegions, refreshSources, refreshJob, regionCode])
 
   useEffect(() => {
     if (job?.status !== 'RUNNING') {
@@ -106,16 +126,38 @@ export default function App() {
     setFlyToken((value) => value + 1)
   }
 
+  function chooseSource(id: string) {
+    setSourceId(id)
+    setProbe(null)
+    localStorage.setItem(SOURCE_KEY, id)
+  }
+
+  async function testSource() {
+    setProbing(true)
+    try {
+      const result = await api<SourceProbe>('/api/ingest/sources/test', {
+        method: 'POST',
+        body: JSON.stringify({ regionCode, sourceId })
+      })
+      setProbe(result)
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '连接测试失败')
+    } finally {
+      setProbing(false)
+    }
+  }
+
   async function startJob() {
     const region = regions.find((item) => item.code === regionCode)
     setStarting(true)
     try {
       const created = await api<JobView>('/api/ingest/jobs', {
         method: 'POST',
-        body: JSON.stringify({ regionCode })
+        body: JSON.stringify({ regionCode, sourceId })
       })
       setJob(created)
-      message.success(`已开始下载${region?.name ?? ''}数据`)
+      const sourceName = sources.find((item) => item.id === sourceId)?.name ?? ''
+      message.success(`已开始从${sourceName}下载${region?.name ?? ''}数据`)
     } catch (error) {
       message.error(error instanceof Error ? error.message : '启动失败')
     } finally {
@@ -237,10 +279,16 @@ export default function App() {
           <JobPanel
             regions={regions}
             regionCode={regionCode}
+            sources={sources}
+            sourceId={sourceId}
+            probe={probe}
+            probing={probing}
             job={job}
             logs={logs}
             loading={starting}
             onRegionChange={showRegion}
+            onSourceChange={chooseSource}
+            onTest={testSource}
             onStart={startJob}
           />
         </Sider>
