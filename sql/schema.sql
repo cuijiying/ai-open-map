@@ -63,12 +63,12 @@ CREATE INDEX IF NOT EXISTS idx_ingest_job_log_job
 -- OSM 要素
 -- ---------------------------------------------------------------------------
 
--- 按省分区。发布时只摘掉并挂上对应分区，其他省的切片查询不会被这次写入挡住。
--- 主键必须带上分区键。id 仍用序列，分区之间可以重复。
+-- 按省 LIST 分区。主键必须带分区键。已有普通表由入库服务启动时复制后再换名。
+-- 发布时只摘掉并挂上对应分区，其他省的切片查询不会被这次写入挡住。
 CREATE SEQUENCE IF NOT EXISTS osm_feature_id_seq;
 
 CREATE TABLE IF NOT EXISTS osm_feature (
-    id          BIGINT       NOT NULL DEFAULT nextval('osm_feature_id_seq'),
+    id          BIGINT NOT NULL DEFAULT nextval('osm_feature_id_seq'),
     osm_id      BIGINT       NOT NULL,
     osm_type    VARCHAR(8)   NOT NULL,
     layer       VARCHAR(32)  NOT NULL,
@@ -78,17 +78,17 @@ CREATE TABLE IF NOT EXISTS osm_feature (
     geom        geometry(Geometry, 4326) NOT NULL,
     region_code VARCHAR(32)  NOT NULL,
     job_id      BIGINT,
+    CONSTRAINT pk_osm_feature PRIMARY KEY (id, region_code),
     CONSTRAINT ck_osm_feature_type CHECK (osm_type IN ('node', 'way')),
     CONSTRAINT ck_osm_feature_layer CHECK (layer IN (
         'highway', 'railway', 'waterway', 'water',
         'building', 'landuse', 'boundary', 'poi', 'place'
-    )),
-    PRIMARY KEY (id, region_code)
+    ))
 ) PARTITION BY LIST (region_code);
 
 ALTER SEQUENCE osm_feature_id_seq OWNED BY osm_feature.id;
 
-COMMENT ON TABLE osm_feature IS '按省份分区的 OSM 要素。地图服务按 layer 输出矢量切片，一次可以包含多个省';
+COMMENT ON TABLE osm_feature IS '按省分区的 OSM 要素。地图服务按图层输出矢量切片，一次可以包含多个省；发布时整省替换分区';
 COMMENT ON COLUMN osm_feature.layer IS 'highway 道路 / railway 铁路 / waterway 水系线 / water 水体 / building 建筑 / landuse 土地利用 / boundary 行政区划 / poi 兴趣点 / place 地名';
 COMMENT ON COLUMN osm_feature.sub_type IS '图层内分类，例如 highway=primary、amenity=school';
 COMMENT ON COLUMN osm_feature.geom IS 'WGS84 几何。道路、水系、铁路、边界为线，建筑、用地、水体为面，地名和兴趣点为点';
@@ -103,15 +103,15 @@ CREATE INDEX IF NOT EXISTS idx_osm_feature_layer
 CREATE INDEX IF NOT EXISTS idx_osm_feature_name
     ON osm_feature USING GIN (name gin_trgm_ops);
 
--- 已有库的表结构不会随 CREATE TABLE IF NOT EXISTS 更新，这里补列并给旧的安徽数据打上区域。
+-- 旧库如果还是普通表，补上区域列。空值只是历史数据的兜底，不表示系统只服务一个省。
 ALTER TABLE osm_feature ADD COLUMN IF NOT EXISTS region_code VARCHAR(32);
 UPDATE osm_feature SET region_code = 'anhui' WHERE region_code IS NULL;
 ALTER TABLE osm_feature ALTER COLUMN region_code SET NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_osm_feature_region
     ON osm_feature (region_code, layer);
-COMMENT ON COLUMN osm_feature.region_code IS '省级区域代码，与 Geofabrik 文件名一致，例如 anhui、zhejiang';
+COMMENT ON COLUMN osm_feature.region_code IS '省级区域代码，与数据文件名一致，例如 anhui、zhejiang、guangdong';
 
--- 入库缓冲表。下载和解析只写这里，几何和索引建在旁路表上，最后用一次短事务替换该省分区。
+-- 解析缓冲。切片不读这张表。发布时再写入该省独立缓冲表，建好索引后短事务换分区。
 CREATE UNLOGGED TABLE IF NOT EXISTS osm_feature_stage (
     osm_id   BIGINT,
     osm_type VARCHAR(8),
@@ -122,7 +122,7 @@ CREATE UNLOGGED TABLE IF NOT EXISTS osm_feature_stage (
     wkt      TEXT
 );
 
-COMMENT ON TABLE osm_feature_stage IS '解析缓冲表，无索引。不参与切片查询';
+COMMENT ON TABLE osm_feature_stage IS '解析缓冲表，无索引。切片不读这张表；发布时先灌进该省缓冲表，再换分区';
 
 -- ---------------------------------------------------------------------------
 -- 对话模型

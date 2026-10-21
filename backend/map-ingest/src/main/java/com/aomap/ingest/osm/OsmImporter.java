@@ -60,12 +60,22 @@ public class OsmImporter {
         if (staged == 0) {
             throw new IllegalStateException("没有解析到可入库的要素");
         }
-        progress.report("IMPORT", 82, "解析完成，共 " + staged + " 条要素。正在旁路建索引，已发布的切片仍可访问");
-        features.materialize(jobId, regionCode);
-        progress.report("INDEX", 94, "索引已完成，正在替换该省分区");
-        long stored = features.publish(jobId, regionCode);
-        progress.report("INDEX", 97, "该省分区已替换，其他省份的切片没有中断");
-        return stored;
+        progress.report("IMPORT", 82, "解析完成，共 " + staged + " 条要素。开始写入该省缓冲，已发布的切片仍可使用");
+        features.startBuild(regionCode);
+        try {
+            long loaded = features.copyIntoBuild(jobId, regionCode);
+            if (loaded == 0) {
+                throw new IllegalStateException("没有可发布的要素");
+            }
+            progress.report("INDEX", 90, "正在为该省建立空间索引，其他省份的切片不受影响");
+            features.indexBuild(regionCode);
+            progress.report("INDEX", 96, "正在切换该省的已发布数据");
+            features.publishBuild(regionCode);
+        } catch (RuntimeException ex) {
+            features.abortBuild(regionCode);
+            throw ex;
+        }
+        return features.countStored(regionCode);
     }
 
     private final class ParserSink implements Sink {

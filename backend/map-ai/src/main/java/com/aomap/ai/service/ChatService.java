@@ -77,7 +77,7 @@ public class ChatService {
     private void apply(FollowUp followUp, ChatRequest request, List<MapAction> actions, List<DataTable> tables, StringBuilder reply) {
         switch (followUp.kind()) {
             case "layers" -> {
-                List<LayerCount> layers = geoApi.layers(regionQuery(request));
+                List<LayerCount> layers = geoApi.layers(regionCodes(request));
                 List<List<Object>> rows = new ArrayList<>();
                 long total = 0;
                 for (LayerCount layer : layers) {
@@ -88,7 +88,7 @@ public class ChatService {
                 reply.append("\n").append(regionLabel(request)).append("共 ").append(total).append(" 条要素。");
             }
             case "stats" -> {
-                List<StatItem> items = geoApi.stats(regionQuery(request), followUp.layer());
+                List<StatItem> items = geoApi.stats(regionCodes(request), followUp.layer());
                 List<List<Object>> rows = new ArrayList<>();
                 for (StatItem item : items) {
                     rows.add(List.of(item.subtype(), item.count()));
@@ -98,7 +98,7 @@ public class ChatService {
                         .append(items.stream().mapToLong(StatItem::count).sum()).append(" 条。");
             }
             case "search" -> {
-                List<SearchHit> hits = geoApi.search(regionQuery(request), followUp.keyword(), followUp.layer());
+                List<SearchHit> hits = geoApi.search(regionCodes(request), followUp.keyword(), followUp.layer());
                 if (hits.isEmpty()) {
                     reply.append("\n没有找到“").append(followUp.keyword()).append("”。");
                     return;
@@ -117,7 +117,7 @@ public class ChatService {
             }
             case "analyze" -> {
                 double[] bbox = bbox(request);
-                AnalysisResult result = geoApi.analyze(regionQuery(request), followUp.layer(), bbox[0], bbox[1], bbox[2], bbox[3]);
+                AnalysisResult result = geoApi.analyze(regionCodes(request), followUp.layer(), bbox[0], bbox[1], bbox[2], bbox[3]);
                 tables.add(new DataTable("视野统计", List.of("指标", "数值"), List.of(
                         List.of("数量", result.count()),
                         List.of("长度", formatLength(result.lengthMeters())),
@@ -223,8 +223,12 @@ public class ChatService {
         return regionCode(request);
     }
 
+    private static List<String> regionCodes(ChatRequest request) {
+        return Regions.requireCodes(regionQuery(request));
+    }
+
     private static String regionLabel(ChatRequest request) {
-        return Regions.describe(Regions.requireCodes(regionQuery(request)));
+        return Regions.describe(regionCodes(request));
     }
 
     private static String lastUserText(ChatRequest request) {
