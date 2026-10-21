@@ -10,7 +10,7 @@ interface Props {
   visible: Record<string, boolean>
   filters: Record<string, string[] | undefined>
   markers: MarkerPoint[]
-  region: string
+  regions: string[]
   flyToken: number
   center: [number, number]
   zoom: number
@@ -18,19 +18,19 @@ interface Props {
   onBounds: (bbox: [number, number, number, number]) => void
 }
 
-export default function MapView({ visible, filters, markers, region, flyToken, center, zoom, style, onBounds }: Props) {
+export default function MapView({ visible, filters, markers, regions, flyToken, center, zoom, style, onBounds }: Props) {
   const container = useRef<HTMLDivElement>(null)
   const mapRef = useRef<Map | null>(null)
   const ready = useRef(false)
   const visibleRef = useRef(visible)
   const filtersRef = useRef(filters)
   const onBoundsRef = useRef(onBounds)
-  const regionRef = useRef(region)
+  const regionsRef = useRef(regions)
   const styleRef = useRef(style)
   visibleRef.current = visible
   filtersRef.current = filters
   onBoundsRef.current = onBounds
-  regionRef.current = region
+  regionsRef.current = regions
   styleRef.current = style
 
   useEffect(() => {
@@ -74,7 +74,7 @@ export default function MapView({ visible, filters, markers, region, flyToken, c
       for (const layer of LAYERS) {
         map.addSource(layer.id, {
           type: 'vector',
-          tiles: [tileUrl(regionRef.current, layer.id)],
+          tiles: [tileUrl(regionsRef.current, layer.id)],
           minzoom: layer.minzoom,
           maxzoom: 16
         })
@@ -158,10 +158,10 @@ export default function MapView({ visible, filters, markers, region, flyToken, c
     for (const layer of LAYERS) {
       const source = map.getSource(layer.id)
       if (source instanceof VectorTileSource) {
-        source.setTiles([tileUrl(region, layer.id)])
+        source.setTiles([tileUrl(regions, layer.id)])
       }
     }
-  }, [region])
+  }, [regions])
 
   useEffect(() => {
     const map = mapRef.current
@@ -195,8 +195,20 @@ export default function MapView({ visible, filters, markers, region, flyToken, c
   )
 }
 
-function tileUrl(region: string, layer: string) {
-  return `${window.location.origin}/api/tiles/${layer}/{z}/{x}/{y}.pbf?region=${encodeURIComponent(region)}`
+function tileUrl(regions: string[], layer: string) {
+  const query = regionsQuery(regions)
+  return `${window.location.origin}/api/tiles/${layer}/{z}/{x}/{y}.pbf?${query}`
+}
+
+function regionsQuery(regions: string[]) {
+  const codes = regions.filter(Boolean)
+  if (codes.length === 0) {
+    return 'region=anhui'
+  }
+  if (codes.length === 1) {
+    return `region=${encodeURIComponent(codes[0])}`
+  }
+  return `regions=${encodeURIComponent(codes.join(','))}`
 }
 
 function emptyCollection() {

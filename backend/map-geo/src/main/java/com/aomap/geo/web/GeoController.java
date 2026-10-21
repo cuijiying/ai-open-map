@@ -34,16 +34,18 @@ public class GeoController {
     @GetMapping(value = "/api/tiles/{layer}/{z}/{x}/{y}.pbf")
     public ResponseEntity<byte[]> tile(@PathVariable String layer, @PathVariable int z,
                                        @PathVariable int x, @PathVariable int y,
+                                       @RequestParam(required = false) String regions,
                                        @RequestParam(defaultValue = "anhui") String region) {
         return ResponseEntity.ok()
                 .contentType(MVT)
                 .cacheControl(CacheControl.maxAge(Duration.ofMinutes(2)).cachePublic())
-                .body(tiles.tile(region, layer, z, x, y));
+                .body(tiles.tile(regions, region, layer, z, x, y));
     }
 
     @GetMapping("/api/geo/layers")
-    public ApiResult<List<LayerCount>> layers(@RequestParam(defaultValue = "anhui") String region) {
-        return ApiResult.ok(queries.layers(region));
+    public ApiResult<List<LayerCount>> layers(@RequestParam(required = false) String regions,
+                                              @RequestParam(defaultValue = "anhui") String region) {
+        return ApiResult.ok(queries.layers(regions, region));
     }
 
     @GetMapping("/api/geo/stats")

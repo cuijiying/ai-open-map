@@ -10,6 +10,16 @@
          GROUP BY layer
     </select>
 
+    <select id="countByLayerInRegions" resultType="com.aomap.geo.domain.NameCount">
+        SELECT layer AS name, COUNT(*) AS count
+          FROM osm_feature
+         WHERE region_code IN
+           <foreach collection="regions" item="code" open="(" separator="," close=")">
+               #{code}
+           </foreach>
+         GROUP BY layer
+    </select>
+
     <select id="stats" resultType="com.aomap.geo.domain.NameCount">
         SELECT sub_type AS name, COUNT(*) AS count
           FROM osm_feature

@@ -26,7 +26,10 @@
                    CAST(f.osm_id AS text) AS osm_id
               FROM osm_feature f
               CROSS JOIN bounds b
-             WHERE f.region_code = #{region}
+             WHERE f.region_code IN
+               <foreach collection="regions" item="code" open="(" separator="," close=")">
+                   #{code}
+               </foreach>
                AND f.layer = #{layer}
                AND f.geom &amp;&amp; b.g4326
             <if test="layer == 'highway'">

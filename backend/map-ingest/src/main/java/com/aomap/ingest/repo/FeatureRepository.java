@@ -67,8 +67,12 @@ public class FeatureRepository {
         features.disableStatementTimeout();
         features.deleteRegion(regionCode);
         features.insertFromStage(jobId, regionCode);
-        features.analyzeFeatures();
         return features.countFeatures(regionCode);
+    }
+
+    /** 在 publish 事务提交后执行，避免 ANALYZE 拉长写事务、阻塞切片读取。 */
+    public void analyzePublished() {
+        features.analyzeFeatures();
     }
 
     public Map<String, Long> countByLayer(String regionCode) {
