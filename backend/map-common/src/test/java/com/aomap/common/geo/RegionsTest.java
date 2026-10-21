@@ -10,19 +10,16 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class RegionsTest {
 
     @Test
-    void parseCodesUsesSingleRegionWhenRegionsBlank() {
-        assertEquals(List.of("anhui"), Regions.parseCodes(null, "anhui"));
-        assertEquals(List.of("zhejiang"), Regions.parseCodes("  ", "zhejiang"));
+    void acceptsSeveralProvincesAndSkipsUnknownCodes() {
+        assertEquals(List.of("anhui", "zhejiang"), Regions.acceptedCodes(" anhui, Zhejiang ,missing"));
+        assertEquals(List.of(), Regions.acceptedCodes("missing"));
+        assertEquals(List.of("anhui"), Regions.acceptedCodes(" "));
     }
 
     @Test
-    void parseCodesSplitsAndDedupes() {
-        assertEquals(List.of("anhui", "zhejiang"), Regions.parseCodes("anhui,zhejiang", "beijing"));
-        assertEquals(List.of("anhui", "zhejiang"), Regions.parseCodes("anhui, anhui ,zhejiang", "beijing"));
-    }
-
-    @Test
-    void parseCodesRejectsUnknown() {
-        assertThrows(IllegalArgumentException.class, () -> Regions.parseCodes("nosuch", "anhui"));
+    void requireCodesRejectsAnUnknownProvince() {
+        assertThrows(IllegalArgumentException.class, () -> Regions.requireCodes("anhui,missing"));
+        assertEquals(List.of("zhejiang", "anhui"), Regions.requireCodes("zhejiang,anhui,zhejiang"));
+        assertEquals("安徽省、浙江省", Regions.describe(List.of("anhui", "zhejiang")));
     }
 }

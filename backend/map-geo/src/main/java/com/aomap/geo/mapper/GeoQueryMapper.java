@@ -11,15 +11,13 @@ import java.util.List;
 @Mapper
 public interface GeoQueryMapper {
 
-    List<NameCount> countByLayer(@Param("region") String region);
+    List<NameCount> countByLayer(@Param("regions") List<String> regions);
 
-    List<NameCount> countByLayerInRegions(@Param("regions") List<String> regions);
+    List<NameCount> stats(@Param("regions") List<String> regions, @Param("layer") String layer);
 
-    List<NameCount> stats(@Param("region") String region, @Param("layer") String layer);
+    List<SearchRow> search(@Param("regions") List<String> regions, @Param("pattern") String pattern, @Param("layer") String layer, @Param("limit") int limit);
 
-    List<SearchRow> search(@Param("region") String region, @Param("pattern") String pattern, @Param("layer") String layer, @Param("limit") int limit);
-
-    AnalysisRow analyze(@Param("region") String region,
+    AnalysisRow analyze(@Param("regions") List<String> regions,
                         @Param("layer") String layer,
                         @Param("minLon") double minLon,
                         @Param("minLat") double minLat,

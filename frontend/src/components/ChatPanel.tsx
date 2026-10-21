@@ -36,7 +36,7 @@ export default function ChatPanel({ messages, loading, onSend }: Props) {
         ))}
       </div>
       <div className="messages">
-        {messages.length === 0 && <div className="hint">可以直接说“定位到杭州”“切换深色风格”或“把道路改成红色”。统计和查找只针对当前选择的省份。</div>}
+        {messages.length === 0 && <div className="hint">可以直接说“定位到杭州”“切换深色风格”或“把道路改成红色”。统计和查找针对地图上同时显示的省份。</div>}
         {messages.map((message, index) => (
           <div key={index} className={`bubble ${message.role}`}>
             <div className="bubble-text">{message.content}</div>

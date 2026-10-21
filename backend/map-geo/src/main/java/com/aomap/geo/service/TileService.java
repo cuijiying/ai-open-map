@@ -17,18 +17,16 @@ public class TileService {
         this.tiles = tiles;
     }
 
-    public byte[] tile(String regions, String region, String layer, int z, int x, int y) {
-        List<String> codes;
-        try {
-            codes = Regions.parseCodes(regions, region);
-        } catch (IllegalArgumentException ex) {
-            return new byte[0];
-        }
+    public byte[] tile(String regions, String layer, int z, int x, int y) {
         if (!Layers.known(layer) || z < 0 || z > 16) {
             return new byte[0];
         }
         int span = 1 << z;
         if (x < 0 || y < 0 || x >= span || y >= span) {
+            return new byte[0];
+        }
+        List<String> codes = Regions.acceptedCodes(regions);
+        if (codes.isEmpty()) {
             return new byte[0];
         }
         String encoded = tiles.mvt(codes, layer, z, x, y);

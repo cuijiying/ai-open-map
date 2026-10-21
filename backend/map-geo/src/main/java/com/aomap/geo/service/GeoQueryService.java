@@ -26,13 +26,10 @@ public class GeoQueryService {
         this.queries = queries;
     }
 
-    public List<LayerCount> layers(String regions, String region) {
-        List<String> codes = Regions.parseCodes(regions, region);
+    public List<LayerCount> layers(String regions) {
+        List<String> codes = Regions.requireCodes(regions);
         Map<String, Long> counts = new HashMap<>();
-        List<NameCount> rows = codes.size() == 1
-                ? queries.countByLayer(codes.get(0))
-                : queries.countByLayerInRegions(codes);
-        for (NameCount row : rows) {
+        for (NameCount row : queries.countByLayer(codes)) {
             counts.put(row.getName(), row.getCount() == null ? 0L : row.getCount());
         }
         List<LayerCount> result = new ArrayList<>();
@@ -42,11 +39,11 @@ public class GeoQueryService {
         return result;
     }
 
-    public List<StatItem> stats(String region, String layer) {
-        String regionCode = requireRegion(region);
+    public List<StatItem> stats(String regions, String layer) {
+        List<String> codes = Regions.requireCodes(regions);
         requireLayer(layer);
         List<StatItem> items = new ArrayList<>();
-        for (NameCount row : queries.stats(regionCode, layer)) {
+        for (NameCount row : queries.stats(codes, layer)) {
             items.add(new StatItem(row.getName(), row.getCount() == null ? 0L : row.getCount()));
         }
         return items;
@@ -63,27 +60,29 @@ public class GeoQueryService {
         String pattern = likePattern(keyword.trim());
         String layerArg = layer == null || layer.isBlank() ? null : layer;
         List<SearchHit> hits = new ArrayList<>();
-        for (SearchRow row : queries.search(requireRegion(region), pattern, layerArg, size)) {
+        for (SearchRow row : queries.search(Regions.requireCodes(region), pattern, layerArg, size)) {
+            String regionName = row.getRegionCode() == null ? "" : Regions.require(row.getRegionCode()).name();
             hits.add(new SearchHit(
                     row.getOsmId() == null ? 0L : row.getOsmId(),
                     row.getLayer(),
                     row.getSubtype(),
                     row.getName(),
                     row.getLon() == null ? 0 : row.getLon(),
-                    row.getLat() == null ? 0 : row.getLat()
+                    row.getLat() == null ? 0 : row.getLat(),
+                    regionName
             ));
         }
         return hits;
     }
 
-    public AnalysisResult analyze(String region, String layer, double minLon, double minLat, double maxLon, double maxLat) {
-        String regionCode = requireRegion(region);
+    public AnalysisResult analyze(String regions, String layer, double minLon, double minLat, double maxLon, double maxLat) {
+        List<String> codes = Regions.requireCodes(regions);
         requireLayer(layer);
         if (!(minLon < maxLon) || !(minLat < maxLat)
                 || minLon < -180 || maxLon > 180 || minLat < -90 || maxLat > 90) {
             throw new IllegalArgumentException("视野范围无效");
         }
-        AnalysisRow row = queries.analyze(regionCode, layer, minLon, minLat, maxLon, maxLat);
+        AnalysisRow row = queries.analyze(codes, layer, minLon, minLat, maxLon, maxLat);
         if (row == null) {
             return new AnalysisResult(layer, 0, 0, 0);
         }
@@ -93,10 +92,6 @@ public class GeoQueryService {
                 row.getLengthMeters() == null ? 0 : row.getLengthMeters(),
                 row.getAreaSquareMeters() == null ? 0 : row.getAreaSquareMeters()
         );
-    }
-
-    private static String requireRegion(String region) {
-        return Regions.require(region == null || region.isBlank() ? "anhui" : region).code();
     }
 
     private static void requireLayer(String layer) {

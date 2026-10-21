@@ -60,11 +60,11 @@ public class OsmImporter {
         if (staged == 0) {
             throw new IllegalStateException("没有解析到可入库的要素");
         }
-        progress.report("IMPORT", 82, "解析完成，共 " + staged + " 条要素，开始写入正式表");
+        progress.report("IMPORT", 82, "解析完成，共 " + staged + " 条要素。正在旁路建索引，已发布的切片仍可访问");
+        features.materialize(jobId, regionCode);
+        progress.report("INDEX", 94, "索引已完成，正在替换该省分区");
         long stored = features.publish(jobId, regionCode);
-        progress.report("INDEX", 92, "该省数据已替换，正在更新统计信息");
-        features.analyzePublished();
-        progress.report("INDEX", 96, "统计信息已更新，切片服务可继续读取其他省份");
+        progress.report("INDEX", 97, "该省分区已替换，其他省份的切片没有中断");
         return stored;
     }
 

@@ -6,6 +6,7 @@ public class SearchRow {
     private String layer;
     private String subtype;
     private String name;
+    private String regionCode;
     private Double lon;
     private Double lat;
 
@@ -39,6 +40,14 @@ public class SearchRow {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public String getRegionCode() {
+        return regionCode;
+    }
+
+    public void setRegionCode(String regionCode) {
+        this.regionCode = regionCode;
     }
 
     public Double getLon() {

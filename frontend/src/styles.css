@@ -36,6 +36,7 @@ body { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; background: #f3f5
 .panel, .chat { padding: 12px 14px 8px; }
 .panel-title { display: flex; justify-content: space-between; align-items: center; font-weight: 650; margin-bottom: 8px; }
 .region-select { width: 100%; margin-bottom: 8px; }
+.source-current .region-select-inline { width: auto; flex: 1; min-width: 0; margin-bottom: 0; }
 .source-current { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 13px; }
 .source-current span { color: #667085; }
 .source-current strong { flex: 1; min-width: 0; }

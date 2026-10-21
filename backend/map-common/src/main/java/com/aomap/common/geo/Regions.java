@@ -1,8 +1,10 @@
 package com.aomap.common.geo;
 
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Geofabrik 中国省级提取。code 对应
@@ -84,24 +86,61 @@ public final class Regions {
     }
 
     /**
-     * 解析切片/查询请求的省份列表。优先 {@code regions}（逗号分隔），否则退回单个 {@code region}。
+     * 地图和统计使用的省份列表。空串默认安徽省；未知代码跳过。
+     * 传入内容非空但没有一个合法省份时返回空列表，调用方据此给出空切片。
      */
-    public static List<String> parseCodes(String regions, String region) {
-        LinkedHashSet<String> codes = new LinkedHashSet<>();
-        if (regions != null && !regions.isBlank()) {
-            for (String part : regions.split(",")) {
-                if (part == null || part.isBlank()) {
-                    continue;
-                }
-                codes.add(require(part.trim()).code());
-            }
-        } else {
-            codes.add(require(region == null || region.isBlank() ? "anhui" : region).code());
+    public static List<String> acceptedCodes(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return List.of(require("anhui").code());
         }
+        return distinctCodes(raw, false);
+    }
+
+    /**
+     * 严格解析。空串默认安徽省；任何一个未知代码都拒绝。
+     */
+    public static List<String> requireCodes(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return List.of(require("anhui").code());
+        }
+        List<String> codes = distinctCodes(raw, true);
         if (codes.isEmpty()) {
-            throw new IllegalArgumentException("请至少指定一个省份");
+            throw new IllegalArgumentException("请选择省份");
         }
-        return List.copyOf(codes);
+        return codes;
+    }
+
+    public static String describe(List<String> codes) {
+        if (codes == null || codes.isEmpty()) {
+            return "未选择省份";
+        }
+        StringBuilder text = new StringBuilder();
+        for (String code : codes) {
+            if (!text.isEmpty()) {
+                text.append('、');
+            }
+            text.append(require(code).name());
+        }
+        return text.toString();
+    }
+
+    private static List<String> distinctCodes(String raw, boolean strict) {
+        Set<String> codes = new LinkedHashSet<>();
+        for (String part : raw.split(",")) {
+            String token = part.trim();
+            if (token.isEmpty()) {
+                continue;
+            }
+            Optional<Region> region = find(token);
+            if (region.isEmpty()) {
+                if (strict) {
+                    throw new IllegalArgumentException("未知省份: " + token);
+                }
+                continue;
+            }
+            codes.add(region.get().code());
+        }
+        return new ArrayList<>(codes);
     }
 
     private static Region region(
