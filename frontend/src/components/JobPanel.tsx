@@ -11,6 +11,7 @@ const PHASES = [
 interface Props {
   regions: RegionOption[]
   regionCode: string
+  mapRegions: string[]
   sources: SourceOption[]
   sourceId: string
   probe: SourceProbe | null
@@ -19,6 +20,9 @@ interface Props {
   logs: LogView[]
   loading: boolean
   onRegionChange: (code: string) => void
+  onMapRegionsChange: (codes: string[]) => void
+  onFit: () => void
+  onLocate: () => void
   onSourceChange: (id: string) => void
   onTest: () => void
   onStart: () => void
@@ -29,8 +33,8 @@ function elapsedText(ms: number) {
 }
 
 export default function JobPanel({
-  regions, regionCode, sources, sourceId, probe, probing, job, logs, loading,
-  onRegionChange, onSourceChange, onTest, onStart
+  regions, regionCode, mapRegions, sources, sourceId, probe, probing, job, logs, loading,
+  onRegionChange, onMapRegionsChange, onFit, onLocate, onSourceChange, onTest, onStart
 }: Props) {
   const running = job?.status === 'RUNNING'
   const current = Math.max(0, PHASES.findIndex((item) => item.key === job?.phase))
@@ -42,22 +46,47 @@ export default function JobPanel({
   return (
     <section className="panel">
       <div className="panel-title">
+        <span>地图省份</span>
+        <Button size="small" disabled={mapRegions.length === 0} onClick={onFit}>缩放</Button>
+      </div>
+      <Select
+        className="region-select"
+        mode="multiple"
+        allowClear
+        showSearch
+        optionFilterProp="label"
+        placeholder="选择要同时显示的省份"
+        maxTagCount="responsive"
+        value={mapRegions}
+        options={regions.map((item) => ({
+          value: item.code,
+          label: item.featureCount > 0 ? `${item.name} · ${item.featureCount.toLocaleString('zh-CN')}` : `${item.name} · 未入库`
+        }))}
+        onChange={onMapRegionsChange}
+      />
+      <Typography.Paragraph type="secondary" className="hint">
+        可以同时勾选多个省，矢量切片会把这些省画在同一张地图上。图层数量是所选省份的合计。
+      </Typography.Paragraph>
+      <div className="panel-title">
         <span>数据入库</span>
         <Button type="primary" size="small" loading={loading || running} disabled={running} onClick={onStart}>
           下载
         </Button>
       </div>
-      <Select
-        className="region-select"
-        showSearch
-        optionFilterProp="label"
-        value={regionCode}
-        options={regions.map((item) => ({
-          value: item.code,
-          label: item.featureCount > 0 ? `${item.name} · 已入库` : item.name
-        }))}
-        onChange={onRegionChange}
-      />
+      <div className="source-current">
+        <Select
+          className="region-select region-select-inline"
+          showSearch
+          optionFilterProp="label"
+          value={regionCode}
+          options={regions.map((item) => ({
+            value: item.code,
+            label: item.featureCount > 0 ? `${item.name} · 已入库` : item.name
+          }))}
+          onChange={onRegionChange}
+        />
+        <Button size="small" onClick={onLocate}>定位</Button>
+      </div>
       <Select
         className="region-select"
         value={sourceId}
@@ -86,15 +115,15 @@ export default function JobPanel({
           <span>{probe.message} · {elapsedText(probe.elapsedMs)}</span>
         </div>
       ) : null}
-      {running && job && job.regionCode !== regionCode ? (
+      {running && job ? (
         <Typography.Paragraph type="secondary" className="hint">
-          正在下载{job.regionName}，完成前不能开始新的省份任务。
+          正在处理{job.regionName}。下载、解析和建索引不改已发布的地图，完成前不能再开始另一个入库任务。
         </Typography.Paragraph>
       ) : null}
       <Typography.Paragraph type="secondary" className="hint">
         {selectedRegion && selectedRegion.featureCount > 0
-          ? `${selectedRegion.name}已有 ${selectedRegion.featureCount.toLocaleString('zh-CN')} 条要素，切换后地图只展示该省。再次下载会替换该省数据，不影响其他省。`
-          : '该省尚未入库。下载完成后地图会展示这一省。每天 03:00 自动更新安徽省。'}
+          ? `${selectedRegion.name}已有 ${selectedRegion.featureCount.toLocaleString('zh-CN')} 条要素。再次下载只替换该省分区，其他省的切片保持可用。`
+          : '该省尚未入库。下载完成后会加入地图。每天 03:00 自动更新安徽省。'}
       </Typography.Paragraph>
       {job && (
         <>

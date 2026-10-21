@@ -6,14 +6,16 @@
     <select id="countByLayer" resultType="com.aomap.geo.domain.NameCount">
         SELECT layer AS name, COUNT(*) AS count
           FROM osm_feature
-         WHERE region_code = #{region}
+         WHERE region_code IN
+         <foreach collection="regions" item="code" open="(" separator="," close=")">#{code}</foreach>
          GROUP BY layer
     </select>
 
     <select id="stats" resultType="com.aomap.geo.domain.NameCount">
         SELECT sub_type AS name, COUNT(*) AS count
           FROM osm_feature
-         WHERE region_code = #{region}
+         WHERE region_code IN
+         <foreach collection="regions" item="code" open="(" separator="," close=")">#{code}</foreach>
            AND layer = #{layer}
          GROUP BY sub_type
          ORDER BY COUNT(*) DESC
@@ -25,10 +27,12 @@
                layer,
                sub_type AS subtype,
                COALESCE(name, '') AS name,
+               region_code,
                ST_X(ST_PointOnSurface(geom)) AS lon,
                ST_Y(ST_PointOnSurface(geom)) AS lat
           FROM osm_feature
-         WHERE region_code = #{region}
+         WHERE region_code IN
+         <foreach collection="regions" item="code" open="(" separator="," close=")">#{code}</foreach>
            AND (
                 name ILIKE #{pattern} ESCAPE '!'
                 OR sub_type ILIKE #{pattern} ESCAPE '!'
@@ -46,7 +50,8 @@
                COALESCE(SUM(ST_Length(CAST(geom AS geography))), 0) AS length_meters,
                COALESCE(SUM(ST_Area(CAST(geom AS geography))), 0) AS area_square_meters
           FROM osm_feature
-         WHERE region_code = #{region}
+         WHERE region_code IN
+         <foreach collection="regions" item="code" open="(" separator="," close=")">#{code}</foreach>
            AND layer = #{layer}
            AND geom &amp;&amp; ST_MakeEnvelope(#{minLon}, #{minLat}, #{maxLon}, #{maxLat}, 4326)
     </select>

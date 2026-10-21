@@ -34,39 +34,54 @@ public class GeoController {
     @GetMapping(value = "/api/tiles/{layer}/{z}/{x}/{y}.pbf")
     public ResponseEntity<byte[]> tile(@PathVariable String layer, @PathVariable int z,
                                        @PathVariable int x, @PathVariable int y,
-                                       @RequestParam(defaultValue = "anhui") String region) {
+                                       @RequestParam(required = false) String regions,
+                                       @RequestParam(required = false) String region) {
         return ResponseEntity.ok()
                 .contentType(MVT)
                 .cacheControl(CacheControl.maxAge(Duration.ofMinutes(2)).cachePublic())
-                .body(tiles.tile(region, layer, z, x, y));
+                .body(tiles.tile(regionArgument(regions, region), layer, z, x, y));
     }
 
     @GetMapping("/api/geo/layers")
-    public ApiResult<List<LayerCount>> layers(@RequestParam(defaultValue = "anhui") String region) {
-        return ApiResult.ok(queries.layers(region));
+    public ApiResult<List<LayerCount>> layers(@RequestParam(required = false) String regions,
+                                              @RequestParam(required = false) String region) {
+        return ApiResult.ok(queries.layers(regionArgument(regions, region)));
     }
 
     @GetMapping("/api/geo/stats")
-    public ApiResult<List<StatItem>> stats(@RequestParam(defaultValue = "anhui") String region,
+    public ApiResult<List<StatItem>> stats(@RequestParam(required = false) String regions,
+                                           @RequestParam(required = false) String region,
                                            @RequestParam String layer) {
-        return ApiResult.ok(queries.stats(region, layer));
+        return ApiResult.ok(queries.stats(regionArgument(regions, region), layer));
     }
 
     @GetMapping("/api/geo/search")
-    public ApiResult<List<SearchHit>> search(@RequestParam(defaultValue = "anhui") String region,
+    public ApiResult<List<SearchHit>> search(@RequestParam(required = false) String regions,
+                                             @RequestParam(required = false) String region,
                                              @RequestParam String keyword,
                                              @RequestParam(required = false) String layer,
                                              @RequestParam(defaultValue = "8") int limit) {
-        return ApiResult.ok(queries.search(region, keyword, layer, limit));
+        return ApiResult.ok(queries.search(regionArgument(regions, region), keyword, layer, limit));
     }
 
     @GetMapping("/api/geo/analyze")
-    public ApiResult<AnalysisResult> analyze(@RequestParam(defaultValue = "anhui") String region,
+    public ApiResult<AnalysisResult> analyze(@RequestParam(required = false) String regions,
+                                             @RequestParam(required = false) String region,
                                              @RequestParam String layer,
                                              @RequestParam double minLon,
                                              @RequestParam double minLat,
                                              @RequestParam double maxLon,
                                              @RequestParam double maxLat) {
-        return ApiResult.ok(queries.analyze(region, layer, minLon, minLat, maxLon, maxLat));
+        return ApiResult.ok(queries.analyze(regionArgument(regions, region), layer, minLon, minLat, maxLon, maxLat));
+    }
+
+    private static String regionArgument(String regions, String region) {
+        if (regions != null && !regions.isBlank()) {
+            return regions;
+        }
+        if (region != null && !region.isBlank()) {
+            return region;
+        }
+        return null;
     }
 }

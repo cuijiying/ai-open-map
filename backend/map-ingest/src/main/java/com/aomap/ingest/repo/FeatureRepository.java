@@ -6,7 +6,6 @@ import com.aomap.ingest.mapper.FeatureMapper;
 import org.postgresql.copy.CopyManager;
 import org.postgresql.core.BaseConnection;
 import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
 
 import javax.sql.DataSource;
 import java.io.StringReader;
@@ -25,10 +24,13 @@ public class FeatureRepository {
 
     private final FeatureMapper features;
     private final DataSource dataSource;
+    private final FeaturePublisher publisher;
 
     public FeatureRepository(FeatureMapper features, DataSource dataSource) {
         this.features = features;
         this.dataSource = dataSource;
+        this.publisher = new FeaturePublisher(dataSource);
+        this.publisher.ensureReady();
     }
 
     public void truncateStage() {
@@ -62,12 +64,12 @@ public class FeatureRepository {
         return features.countStage();
     }
 
-    @Transactional
+    public void materialize(long jobId, String regionCode) {
+        publisher.materialize(jobId, regionCode);
+    }
+
     public long publish(long jobId, String regionCode) {
-        features.disableStatementTimeout();
-        features.deleteRegion(regionCode);
-        features.insertFromStage(jobId, regionCode);
-        features.analyzeFeatures();
+        publisher.swap(regionCode);
         return features.countFeatures(regionCode);
     }
 

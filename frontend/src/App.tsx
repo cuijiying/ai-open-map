@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Layout, message } from 'antd'
 import { api } from './api'
 import ChatPanel from './components/ChatPanel'
@@ -12,10 +12,27 @@ import { emptyOverrides, isThemeId, loadMapStyle, loadThemeOverrides, paintLayer
 import { ChatMessage, ChatResponse, JobView, LayerCount, LogView, MapAction, MarkerPoint, RegionOption, SourceOption, SourceProbe } from './types'
 
 const SOURCE_KEY = 'aomap.downloadSource'
+const MAP_REGIONS_KEY = 'aomap.mapRegions'
 
 function loadSourceId() {
   const saved = localStorage.getItem(SOURCE_KEY)
   return saved === 'geofabrik' || saved === 'osm-france' ? saved : 'osm-france'
+}
+
+function loadMapRegions() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(MAP_REGIONS_KEY) || '')
+    if (Array.isArray(saved) && saved.every((item) => typeof item === 'string' && item)) {
+      return Array.from(new Set(saved as string[]))
+    }
+  } catch {
+    // 本地没有可用的省份选择时回到安徽省。
+  }
+  return ['anhui']
+}
+
+function rememberMapRegions(codes: string[]) {
+  localStorage.setItem(MAP_REGIONS_KEY, JSON.stringify(codes))
 }
 
 const { Header, Sider, Content } = Layout
@@ -30,6 +47,12 @@ export default function App() {
   const [counts, setCounts] = useState<LayerCount[]>([])
   const [regions, setRegions] = useState<RegionOption[]>([])
   const [regionCode, setRegionCode] = useState('anhui')
+  const [mapRegions, setMapRegions] = useState<string[]>(loadMapRegions)
+  const mapRegionsRef = useRef(mapRegions)
+  mapRegionsRef.current = mapRegions
+  const [tileRevision, setTileRevision] = useState(0)
+  const [bounds, setBounds] = useState<[[number, number], [number, number]] | null>(null)
+  const [boundsToken, setBoundsToken] = useState(0)
   const [sources, setSources] = useState<SourceOption[]>([])
   const [sourceId, setSourceId] = useState(loadSourceId)
   const [probe, setProbe] = useState<SourceProbe | null>(null)
@@ -53,8 +76,13 @@ export default function App() {
     [mapStyle]
   )
 
-  const refreshLayers = useCallback(async (code: string) => {
-    setCounts(await api<LayerCount[]>(`/api/geo/layers?region=${encodeURIComponent(code)}`))
+  const refreshLayers = useCallback(async (codes: string[]) => {
+    if (codes.length === 0) {
+      setCounts([])
+      return
+    }
+    const regionsParam = [...codes].sort().join(',')
+    setCounts(await api<LayerCount[]>(`/api/geo/layers?regions=${encodeURIComponent(regionsParam)}`))
   }, [])
 
   const refreshRegions = useCallback(async () => {
@@ -92,10 +120,31 @@ export default function App() {
 
   useEffect(() => {
     refreshRegions().catch((error: Error) => message.error(error.message))
+  }, [refreshRegions])
+
+  useEffect(() => {
+    if (regions.length === 0) {
+      return
+    }
+    setMapRegions((current) => {
+      const known = current.filter((code) => regions.some((item) => item.code === code))
+      const next = known.length > 0 ? known : ['anhui']
+      if (next.join() === current.join()) {
+        return current
+      }
+      rememberMapRegions(next)
+      return next
+    })
+  }, [regions])
+
+  useEffect(() => {
     refreshSources(regionCode).catch((error: Error) => message.error(error.message))
-    refreshLayers(regionCode).catch((error: Error) => message.error(error.message))
     refreshJob(regionCode).catch((error: Error) => message.error(error.message))
-  }, [refreshLayers, refreshRegions, refreshSources, refreshJob, regionCode])
+  }, [refreshSources, refreshJob, regionCode])
+
+  useEffect(() => {
+    refreshLayers(mapRegions).catch((error: Error) => message.error(error.message))
+  }, [refreshLayers, mapRegions, tileRevision])
 
   useEffect(() => {
     if (job?.status !== 'RUNNING') {
@@ -104,26 +153,73 @@ export default function App() {
     const timer = window.setInterval(() => {
       refreshJob(regionCode)
         .then((latest) => {
-          if (latest && latest.status !== 'RUNNING') {
-            refreshRegions().catch(() => undefined)
-            refreshLayers(regionCode).catch(() => undefined)
+          if (!latest || latest.status === 'RUNNING') {
+            return
+          }
+          refreshRegions().catch(() => undefined)
+          setTileRevision((value) => value + 1)
+          if (latest.status === 'SUCCESS' && latest.regionCode) {
+            const finished = latest.regionCode
+            const alreadyShown = mapRegionsRef.current.includes(finished)
+            setMapRegions((current) => {
+              if (current.includes(finished)) {
+                return current
+              }
+              const next = [...current, finished]
+              rememberMapRegions(next)
+              return next
+            })
+            if (!alreadyShown) {
+              locateRegion(finished)
+            }
           }
         })
         .catch(() => undefined)
     }, 2000)
     return () => window.clearInterval(timer)
-  }, [job?.status, regionCode, refreshJob, refreshLayers, refreshRegions])
+  }, [job?.status, regionCode, refreshJob, refreshRegions])
 
-  function showRegion(code: string) {
-    const region = regions.find((item) => item.code === code)
+  function chooseRegion(code: string) {
     setRegionCode(code)
-    setMarkers([])
+  }
+
+  function locateRegion(code: string) {
+    const region = regions.find((item) => item.code === code)
     if (!region) {
       return
     }
     setCenter([region.lon, region.lat])
     setZoom(region.zoom)
     setFlyToken((value) => value + 1)
+  }
+
+  function changeMapRegions(next: string[]) {
+    const added = next.filter((code) => !mapRegions.includes(code))
+    setMapRegions(next)
+    rememberMapRegions(next)
+    if (added.length === 1) {
+      locateRegion(added[0])
+    }
+  }
+
+  function fitMapRegions() {
+    const picked = regions.filter((item) => mapRegions.includes(item.code))
+    if (picked.length === 0) {
+      return
+    }
+    let minLon = 180
+    let minLat = 90
+    let maxLon = -180
+    let maxLat = -90
+    for (const item of picked) {
+      const span = 360 / (2 ** item.zoom) * 0.9
+      minLon = Math.min(minLon, item.lon - span / 2)
+      maxLon = Math.max(maxLon, item.lon + span / 2)
+      minLat = Math.min(minLat, item.lat - span / 2)
+      maxLat = Math.max(maxLat, item.lat + span / 2)
+    }
+    setBounds([[minLon, minLat], [maxLon, maxLat]])
+    setBoundsToken((value) => value + 1)
   }
 
   function chooseSource(id: string) {
@@ -235,7 +331,14 @@ export default function App() {
         method: 'POST',
         body: JSON.stringify({
           messages: history.map((item) => ({ role: item.role, content: item.content })),
-          map: { center, zoom, bbox, visibleLayers: Object.keys(visible).filter((key) => visible[key]), regionCode }
+          map: {
+            center,
+            zoom,
+            bbox,
+            visibleLayers: Object.keys(visible).filter((key) => visible[key]),
+            regionCode: mapRegions[0] ?? regionCode,
+            regionCodes: mapRegions
+          }
         })
       })
       applyActions(result.actions ?? [])
@@ -247,8 +350,13 @@ export default function App() {
     }
   }
 
-  const regionName = regions.find((item) => item.code === regionCode)?.name ?? '安徽省'
-  const runningLabel = useMemo(() => job?.status === 'RUNNING' ? job.message : regionName, [job, regionName])
+  const mapLabel = mapRegions.length === 0
+    ? '未选择省份'
+    : mapRegions.map((code) => regions.find((item) => item.code === code)?.name ?? code).join('、')
+  const runningLabel = useMemo(
+    () => job?.status === 'RUNNING' ? `${job.message ?? '正在入库'} · 地图仍显示 ${mapLabel}` : mapLabel,
+    [job, mapLabel]
+  )
 
   return (
     <Layout className="app">
@@ -279,6 +387,7 @@ export default function App() {
           <JobPanel
             regions={regions}
             regionCode={regionCode}
+            mapRegions={mapRegions}
             sources={sources}
             sourceId={sourceId}
             probe={probe}
@@ -286,7 +395,10 @@ export default function App() {
             job={job}
             logs={logs}
             loading={starting}
-            onRegionChange={showRegion}
+            onRegionChange={chooseRegion}
+            onMapRegionsChange={changeMapRegions}
+            onFit={fitMapRegions}
+            onLocate={() => locateRegion(regionCode)}
             onSourceChange={chooseSource}
             onTest={testSource}
             onStart={startJob}
@@ -297,8 +409,12 @@ export default function App() {
             visible={visible}
             filters={filters}
             markers={markers}
-            region={regionCode}
+            regions={mapRegions}
+            regionNames={Object.fromEntries(regions.map((item) => [item.code, item.name]))}
+            tileRevision={tileRevision}
             flyToken={flyToken}
+            bounds={bounds}
+            boundsToken={boundsToken}
             center={center}
             zoom={zoom}
             style={mapStyle}

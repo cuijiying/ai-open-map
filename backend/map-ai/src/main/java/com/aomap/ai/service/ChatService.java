@@ -77,7 +77,7 @@ public class ChatService {
     private void apply(FollowUp followUp, ChatRequest request, List<MapAction> actions, List<DataTable> tables, StringBuilder reply) {
         switch (followUp.kind()) {
             case "layers" -> {
-                List<LayerCount> layers = geoApi.layers(regionCode(request));
+                List<LayerCount> layers = geoApi.layers(regionQuery(request));
                 List<List<Object>> rows = new ArrayList<>();
                 long total = 0;
                 for (LayerCount layer : layers) {
@@ -85,20 +85,20 @@ public class ChatService {
                     total += layer.count();
                 }
                 tables.add(new DataTable("图层数量", List.of("图层", "数量"), rows));
-                reply.append("\n").append(Regions.orDefault(regionCode(request)).name()).append("共 ").append(total).append(" 条要素。");
+                reply.append("\n").append(regionLabel(request)).append("共 ").append(total).append(" 条要素。");
             }
             case "stats" -> {
-                List<StatItem> items = geoApi.stats(regionCode(request), followUp.layer());
+                List<StatItem> items = geoApi.stats(regionQuery(request), followUp.layer());
                 List<List<Object>> rows = new ArrayList<>();
                 for (StatItem item : items) {
                     rows.add(List.of(item.subtype(), item.count()));
                 }
                 tables.add(new DataTable(Layers.label(followUp.layer()) + "分类", List.of("类型", "数量"), rows));
-                reply.append("\n").append(Layers.label(followUp.layer())).append("共 ")
+                reply.append("\n").append(regionLabel(request)).append("的").append(Layers.label(followUp.layer())).append("共 ")
                         .append(items.stream().mapToLong(StatItem::count).sum()).append(" 条。");
             }
             case "search" -> {
-                List<SearchHit> hits = geoApi.search(regionCode(request), followUp.keyword(), followUp.layer());
+                List<SearchHit> hits = geoApi.search(regionQuery(request), followUp.keyword(), followUp.layer());
                 if (hits.isEmpty()) {
                     reply.append("\n没有找到“").append(followUp.keyword()).append("”。");
                     return;
@@ -107,17 +107,17 @@ public class ChatService {
                 List<List<Object>> rows = new ArrayList<>();
                 for (SearchHit hit : hits) {
                     markers.add(new MapAction.Marker(hit.name(), hit.layer(), hit.subtype(), hit.lon(), hit.lat()));
-                    rows.add(List.of(hit.name(), Layers.label(hit.layer()), hit.subtype() == null ? "" : hit.subtype()));
+                    rows.add(List.of(hit.name(), hit.region() == null ? "" : hit.region(), Layers.label(hit.layer()), hit.subtype() == null ? "" : hit.subtype()));
                 }
                 actions.add(new MapAction("markers", null, null, null, null, null, markers));
                 SearchHit first = hits.get(0);
                 actions.add(new MapAction("fly_to", null, null, List.of(first.lon(), first.lat()), 13.0, first.name(), null));
-                tables.add(new DataTable("查找结果", List.of("名称", "图层", "类型"), rows));
+                tables.add(new DataTable("查找结果", List.of("名称", "省份", "图层", "类型"), rows));
                 reply.append("\n找到 ").append(hits.size()).append(" 条，已定位到").append(first.name()).append("。");
             }
             case "analyze" -> {
                 double[] bbox = bbox(request);
-                AnalysisResult result = geoApi.analyze(regionCode(request), followUp.layer(), bbox[0], bbox[1], bbox[2], bbox[3]);
+                AnalysisResult result = geoApi.analyze(regionQuery(request), followUp.layer(), bbox[0], bbox[1], bbox[2], bbox[3]);
                 tables.add(new DataTable("视野统计", List.of("指标", "数值"), List.of(
                         List.of("数量", result.count()),
                         List.of("长度", formatLength(result.lengthMeters())),
@@ -197,10 +197,34 @@ public class ChatService {
     }
 
     private static String regionCode(ChatRequest request) {
+        if (request != null && request.map() != null && request.map().regionCodes() != null) {
+            for (String code : request.map().regionCodes()) {
+                if (code != null && !code.isBlank()) {
+                    return code;
+                }
+            }
+        }
         if (request == null || request.map() == null || request.map().regionCode() == null || request.map().regionCode().isBlank()) {
             return "anhui";
         }
         return request.map().regionCode();
+    }
+
+    private static String regionQuery(ChatRequest request) {
+        if (request != null && request.map() != null && request.map().regionCodes() != null) {
+            List<String> codes = request.map().regionCodes().stream()
+                    .filter(code -> code != null && !code.isBlank())
+                    .toList();
+            if (codes.isEmpty()) {
+                throw new IllegalArgumentException("请先在地图上选择省份");
+            }
+            return String.join(",", codes);
+        }
+        return regionCode(request);
+    }
+
+    private static String regionLabel(ChatRequest request) {
+        return Regions.describe(Regions.requireCodes(regionQuery(request)));
     }
 
     private static String lastUserText(ChatRequest request) {
@@ -251,7 +275,14 @@ public class ChatService {
         public record Message(String role, String content) {
         }
 
-        public record MapContext(List<Double> center, Double zoom, List<Double> bbox, List<String> visibleLayers, String regionCode) {
+        public record MapContext(
+                List<Double> center,
+                Double zoom,
+                List<Double> bbox,
+                List<String> visibleLayers,
+                String regionCode,
+                List<String> regionCodes
+        ) {
         }
     }
 

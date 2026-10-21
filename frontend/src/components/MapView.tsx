@@ -10,27 +10,37 @@ interface Props {
   visible: Record<string, boolean>
   filters: Record<string, string[] | undefined>
   markers: MarkerPoint[]
-  region: string
+  regions: string[]
+  regionNames: Record<string, string>
+  tileRevision: number
   flyToken: number
+  bounds: [[number, number], [number, number]] | null
+  boundsToken: number
   center: [number, number]
   zoom: number
   style: ResolvedStyle
   onBounds: (bbox: [number, number, number, number]) => void
 }
 
-export default function MapView({ visible, filters, markers, region, flyToken, center, zoom, style, onBounds }: Props) {
+export default function MapView({
+  visible, filters, markers, regions, regionNames, tileRevision, flyToken, bounds, boundsToken, center, zoom, style, onBounds
+}: Props) {
   const container = useRef<HTMLDivElement>(null)
   const mapRef = useRef<Map | null>(null)
   const ready = useRef(false)
   const visibleRef = useRef(visible)
   const filtersRef = useRef(filters)
   const onBoundsRef = useRef(onBounds)
-  const regionRef = useRef(region)
+  const regionsRef = useRef(regions)
+  const regionNamesRef = useRef(regionNames)
+  const revisionRef = useRef(tileRevision)
   const styleRef = useRef(style)
   visibleRef.current = visible
   filtersRef.current = filters
   onBoundsRef.current = onBounds
-  regionRef.current = region
+  regionsRef.current = regions
+  regionNamesRef.current = regionNames
+  revisionRef.current = tileRevision
   styleRef.current = style
 
   useEffect(() => {
@@ -74,7 +84,7 @@ export default function MapView({ visible, filters, markers, region, flyToken, c
       for (const layer of LAYERS) {
         map.addSource(layer.id, {
           type: 'vector',
-          tiles: [tileUrl(regionRef.current, layer.id)],
+          tiles: [tileUrl(regionsRef.current, layer.id, revisionRef.current)],
           minzoom: layer.minzoom,
           maxzoom: 16
         })
@@ -119,7 +129,8 @@ export default function MapView({ visible, filters, markers, region, flyToken, c
       const props = feature.properties ?? {}
       const source = String(feature.sourceLayer || feature.source || '')
       const name = String(props.name || '未命名')
-      const caption = featureCaption(source, String(props.subtype || ''))
+      const province = regionNamesRef.current[String(props.region || '')] || ''
+      const caption = [featureCaption(source, String(props.subtype || '')), province].filter(Boolean).join(' · ')
       new maplibregl.Popup({ closeButton: true, maxWidth: '280px' })
         .setLngLat(event.lngLat)
         .setHTML(`<div class="map-popup"><div class="map-popup-name">${escapeHtml(name)}</div><div class="map-popup-meta">${escapeHtml(caption)}</div></div>`)
@@ -158,10 +169,10 @@ export default function MapView({ visible, filters, markers, region, flyToken, c
     for (const layer of LAYERS) {
       const source = map.getSource(layer.id)
       if (source instanceof VectorTileSource) {
-        source.setTiles([tileUrl(region, layer.id)])
+        source.setTiles([tileUrl(regions, layer.id, tileRevision)])
       }
     }
-  }, [region])
+  }, [regions, tileRevision])
 
   useEffect(() => {
     const map = mapRef.current
@@ -170,6 +181,14 @@ export default function MapView({ visible, filters, markers, region, flyToken, c
     }
     map.flyTo({ center, zoom, essential: true })
   }, [flyToken])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !bounds) {
+      return
+    }
+    map.fitBounds(bounds, { padding: 48, maxZoom: 8, duration: 700 })
+  }, [boundsToken])
 
   useEffect(() => {
     const map = mapRef.current
@@ -195,8 +214,10 @@ export default function MapView({ visible, filters, markers, region, flyToken, c
   )
 }
 
-function tileUrl(region: string, layer: string) {
-  return `${window.location.origin}/api/tiles/${layer}/{z}/{x}/{y}.pbf?region=${encodeURIComponent(region)}`
+function tileUrl(regions: string[], layer: string, revision: number) {
+  const codes = [...new Set(regions.filter(Boolean))].sort()
+  const value = codes.length === 0 ? 'none' : codes.join(',')
+  return `${window.location.origin}/api/tiles/${layer}/{z}/{x}/{y}.pbf?regions=${encodeURIComponent(value)}&v=${revision}`
 }
 
 function emptyCollection() {

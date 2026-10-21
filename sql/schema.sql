@@ -63,13 +63,17 @@ CREATE INDEX IF NOT EXISTS idx_ingest_job_log_job
 -- OSM 要素
 -- ---------------------------------------------------------------------------
 
+-- 按省分区。发布时只摘掉并挂上对应分区，其他省的切片查询不会被这次写入挡住。
+-- 主键必须带上分区键。id 仍用序列，分区之间可以重复。
+CREATE SEQUENCE IF NOT EXISTS osm_feature_id_seq;
+
 CREATE TABLE IF NOT EXISTS osm_feature (
-    id        BIGSERIAL PRIMARY KEY,
-    osm_id    BIGINT       NOT NULL,
-    osm_type  VARCHAR(8)   NOT NULL,
-    layer     VARCHAR(32)  NOT NULL,
-    sub_type  VARCHAR(64),
-    name      TEXT,
+    id          BIGINT       NOT NULL DEFAULT nextval('osm_feature_id_seq'),
+    osm_id      BIGINT       NOT NULL,
+    osm_type    VARCHAR(8)   NOT NULL,
+    layer       VARCHAR(32)  NOT NULL,
+    sub_type    VARCHAR(64),
+    name        TEXT,
     props       JSONB,
     geom        geometry(Geometry, 4326) NOT NULL,
     region_code VARCHAR(32)  NOT NULL,
@@ -78,10 +82,13 @@ CREATE TABLE IF NOT EXISTS osm_feature (
     CONSTRAINT ck_osm_feature_layer CHECK (layer IN (
         'highway', 'railway', 'waterway', 'water',
         'building', 'landuse', 'boundary', 'poi', 'place'
-    ))
-);
+    )),
+    PRIMARY KEY (id, region_code)
+) PARTITION BY LIST (region_code);
 
-COMMENT ON TABLE osm_feature IS '按图层归一化的 OSM 要素。地图服务按 layer 输出同类型矢量切片';
+ALTER SEQUENCE osm_feature_id_seq OWNED BY osm_feature.id;
+
+COMMENT ON TABLE osm_feature IS '按省份分区的 OSM 要素。地图服务按 layer 输出矢量切片，一次可以包含多个省';
 COMMENT ON COLUMN osm_feature.layer IS 'highway 道路 / railway 铁路 / waterway 水系线 / water 水体 / building 建筑 / landuse 土地利用 / boundary 行政区划 / poi 兴趣点 / place 地名';
 COMMENT ON COLUMN osm_feature.sub_type IS '图层内分类，例如 highway=primary、amenity=school';
 COMMENT ON COLUMN osm_feature.geom IS 'WGS84 几何。道路、水系、铁路、边界为线，建筑、用地、水体为面，地名和兴趣点为点';
@@ -104,7 +111,7 @@ CREATE INDEX IF NOT EXISTS idx_osm_feature_region
     ON osm_feature (region_code, layer);
 COMMENT ON COLUMN osm_feature.region_code IS '省级区域代码，与 Geofabrik 文件名一致，例如 anhui、zhejiang';
 
--- 入库缓冲表。解析阶段只写这里，成功后再替换正式表，避免半成品被地图读到。
+-- 入库缓冲表。下载和解析只写这里，几何和索引建在旁路表上，最后用一次短事务替换该省分区。
 CREATE UNLOGGED TABLE IF NOT EXISTS osm_feature_stage (
     osm_id   BIGINT,
     osm_type VARCHAR(8),
@@ -115,7 +122,7 @@ CREATE UNLOGGED TABLE IF NOT EXISTS osm_feature_stage (
     wkt      TEXT
 );
 
-COMMENT ON TABLE osm_feature_stage IS '解析缓冲表，无索引。发布时再写入 osm_feature';
+COMMENT ON TABLE osm_feature_stage IS '解析缓冲表，无索引。不参与切片查询';
 
 -- ---------------------------------------------------------------------------
 -- 对话模型
