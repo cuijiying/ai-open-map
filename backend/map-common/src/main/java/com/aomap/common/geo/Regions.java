@@ -1,5 +1,6 @@
 package com.aomap.common.geo;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 
@@ -80,6 +81,27 @@ public final class Regions {
 
     public static Region orDefault(String code) {
         return find(code).orElse(require("anhui"));
+    }
+
+    /**
+     * 解析切片/查询请求的省份列表。优先 {@code regions}（逗号分隔），否则退回单个 {@code region}。
+     */
+    public static List<String> parseCodes(String regions, String region) {
+        LinkedHashSet<String> codes = new LinkedHashSet<>();
+        if (regions != null && !regions.isBlank()) {
+            for (String part : regions.split(",")) {
+                if (part == null || part.isBlank()) {
+                    continue;
+                }
+                codes.add(require(part.trim()).code());
+            }
+        } else {
+            codes.add(require(region == null || region.isBlank() ? "anhui" : region).code());
+        }
+        if (codes.isEmpty()) {
+            throw new IllegalArgumentException("请至少指定一个省份");
+        }
+        return List.copyOf(codes);
     }
 
     private static Region region(

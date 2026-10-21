@@ -13,6 +13,17 @@ import { ChatMessage, ChatResponse, JobView, LayerCount, LogView, MapAction, Mar
 
 const SOURCE_KEY = 'aomap.downloadSource'
 
+function regionsQuery(codes: string[]) {
+  const regions = codes.filter(Boolean)
+  if (regions.length === 0) {
+    return 'region=anhui'
+  }
+  if (regions.length === 1) {
+    return `region=${encodeURIComponent(regions[0])}`
+  }
+  return `regions=${encodeURIComponent(regions.join(','))}`
+}
+
 function loadSourceId() {
   const saved = localStorage.getItem(SOURCE_KEY)
   return saved === 'geofabrik' || saved === 'osm-france' ? saved : 'osm-france'
@@ -53,8 +64,14 @@ export default function App() {
     [mapStyle]
   )
 
-  const refreshLayers = useCallback(async (code: string) => {
-    setCounts(await api<LayerCount[]>(`/api/geo/layers?region=${encodeURIComponent(code)}`))
+  const displayRegions = useMemo(() => {
+    const loaded = regions.filter((item) => item.featureCount > 0).map((item) => item.code)
+    return loaded.length > 0 ? loaded : [regionCode]
+  }, [regions, regionCode])
+
+  const refreshLayers = useCallback(async (codes: string[]) => {
+    const query = regionsQuery(codes)
+    setCounts(await api<LayerCount[]>(`/api/geo/layers?${query}`))
   }, [])
 
   const refreshRegions = useCallback(async () => {
@@ -93,9 +110,9 @@ export default function App() {
   useEffect(() => {
     refreshRegions().catch((error: Error) => message.error(error.message))
     refreshSources(regionCode).catch((error: Error) => message.error(error.message))
-    refreshLayers(regionCode).catch((error: Error) => message.error(error.message))
+    refreshLayers(displayRegions).catch((error: Error) => message.error(error.message))
     refreshJob(regionCode).catch((error: Error) => message.error(error.message))
-  }, [refreshLayers, refreshRegions, refreshSources, refreshJob, regionCode])
+  }, [displayRegions, refreshLayers, refreshRegions, refreshSources, refreshJob, regionCode])
 
   useEffect(() => {
     if (job?.status !== 'RUNNING') {
@@ -105,14 +122,18 @@ export default function App() {
       refreshJob(regionCode)
         .then((latest) => {
           if (latest && latest.status !== 'RUNNING') {
-            refreshRegions().catch(() => undefined)
-            refreshLayers(regionCode).catch(() => undefined)
+            refreshRegions()
+              .then((list) => {
+                const loaded = list.filter((item) => item.featureCount > 0).map((item) => item.code)
+                return refreshLayers(loaded.length > 0 ? loaded : [regionCode])
+              })
+              .catch(() => undefined)
           }
         })
         .catch(() => undefined)
     }, 2000)
     return () => window.clearInterval(timer)
-  }, [job?.status, regionCode, refreshJob, refreshLayers, refreshRegions])
+  }, [displayRegions, job?.status, regionCode, refreshJob, refreshLayers, refreshRegions])
 
   function showRegion(code: string) {
     const region = regions.find((item) => item.code === code)
@@ -248,7 +269,18 @@ export default function App() {
   }
 
   const regionName = regions.find((item) => item.code === regionCode)?.name ?? '安徽省'
-  const runningLabel = useMemo(() => job?.status === 'RUNNING' ? job.message : regionName, [job, regionName])
+  const mapRegionLabel = useMemo(() => {
+    if (displayRegions.length <= 1) {
+      return regions.find((item) => item.code === displayRegions[0])?.name ?? regionName
+    }
+    return `地图展示 ${displayRegions.length} 个省`
+  }, [displayRegions, regionName, regions])
+  const runningLabel = useMemo(() => {
+    if (job?.status === 'RUNNING') {
+      return `${job.message}（其他省切片仍可用）`
+    }
+    return mapRegionLabel
+  }, [job, mapRegionLabel])
 
   return (
     <Layout className="app">
@@ -297,7 +329,7 @@ export default function App() {
             visible={visible}
             filters={filters}
             markers={markers}
-            region={regionCode}
+            regions={displayRegions}
             flyToken={flyToken}
             center={center}
             zoom={zoom}

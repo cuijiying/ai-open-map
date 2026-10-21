@@ -13,6 +13,8 @@ public interface GeoQueryMapper {
 
     List<NameCount> countByLayer(@Param("region") String region);
 
+    List<NameCount> countByLayerInRegions(@Param("regions") List<String> regions);
+
     List<NameCount> stats(@Param("region") String region, @Param("layer") String layer);
 
     List<SearchRow> search(@Param("region") String region, @Param("pattern") String pattern, @Param("layer") String layer, @Param("limit") int limit);

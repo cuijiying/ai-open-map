@@ -62,7 +62,9 @@ public class OsmImporter {
         }
         progress.report("IMPORT", 82, "解析完成，共 " + staged + " 条要素，开始写入正式表");
         long stored = features.publish(jobId, regionCode);
-        progress.report("INDEX", 96, "该省数据已替换，统计信息已更新");
+        progress.report("INDEX", 92, "该省数据已替换，正在更新统计信息");
+        features.analyzePublished();
+        progress.report("INDEX", 96, "统计信息已更新，切片服务可继续读取其他省份");
         return stored;
     }
 

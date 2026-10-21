@@ -88,13 +88,25 @@ export default function JobPanel({
       ) : null}
       {running && job && job.regionCode !== regionCode ? (
         <Typography.Paragraph type="secondary" className="hint">
-          正在下载{job.regionName}，完成前不能开始新的省份任务。
+          正在下载{job.regionName}，完成前不能开始新的省份任务；地图上已入库的其他省仍可正常浏览。
+        </Typography.Paragraph>
+      ) : null}
+      {running && job && job.regionCode === regionCode ? (
+        <Typography.Paragraph type="secondary" className="hint">
+          下载解析期间切片服务保持可用；入库完成前本地仍显示该省旧数据，其他省不受影响。
         </Typography.Paragraph>
       ) : null}
       <Typography.Paragraph type="secondary" className="hint">
-        {selectedRegion && selectedRegion.featureCount > 0
-          ? `${selectedRegion.name}已有 ${selectedRegion.featureCount.toLocaleString('zh-CN')} 条要素，切换后地图只展示该省。再次下载会替换该省数据，不影响其他省。`
-          : '该省尚未入库。下载完成后地图会展示这一省。每天 03:00 自动更新安徽省。'}
+        {(() => {
+          const loaded = regions.filter((item) => item.featureCount > 0)
+          const loadedHint = loaded.length > 0
+            ? `地图同时展示已入库的 ${loaded.length} 个省。`
+            : '尚无省份入库，地图按当前所选省份请求切片。'
+          if (selectedRegion && selectedRegion.featureCount > 0) {
+            return `${loadedHint}${selectedRegion.name} 已有 ${selectedRegion.featureCount.toLocaleString('zh-CN')} 条要素；下拉框用于定位与下载，再次下载只替换该省。`
+          }
+          return `${loadedHint}该省尚未入库，下载完成后会自动加入地图。每天 03:00 自动更新安徽省。`
+        })()}
       </Typography.Paragraph>
       {job && (
         <>

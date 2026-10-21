@@ -26,10 +26,13 @@ public class GeoQueryService {
         this.queries = queries;
     }
 
-    public List<LayerCount> layers(String region) {
-        String regionCode = requireRegion(region);
+    public List<LayerCount> layers(String regions, String region) {
+        List<String> codes = Regions.parseCodes(regions, region);
         Map<String, Long> counts = new HashMap<>();
-        for (NameCount row : queries.countByLayer(regionCode)) {
+        List<NameCount> rows = codes.size() == 1
+                ? queries.countByLayer(codes.get(0))
+                : queries.countByLayerInRegions(codes);
+        for (NameCount row : rows) {
             counts.put(row.getName(), row.getCount() == null ? 0L : row.getCount());
         }
         List<LayerCount> result = new ArrayList<>();
