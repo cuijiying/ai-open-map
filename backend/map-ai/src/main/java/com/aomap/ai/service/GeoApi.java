@@ -22,21 +22,21 @@ public class GeoApi {
         this.client = RestClient.builder().baseUrl(baseUrl).build();
     }
 
-    public List<LayerCount> layers(String region) {
-        String uri = UriComponentsBuilder.fromPath("/api/geo/layers").queryParam("region", region).build().toUriString();
+    public List<LayerCount> layers(List<String> regions) {
+        String uri = UriComponentsBuilder.fromPath("/api/geo/layers").queryParam("regions", join(regions)).build().toUriString();
         return body(client.get().uri(uri), new ParameterizedTypeReference<ApiResult<List<LayerCount>>>() {
         });
     }
 
-    public List<StatItem> stats(String region, String layer) {
-        String uri = UriComponentsBuilder.fromPath("/api/geo/stats").queryParam("region", region).queryParam("layer", layer).build().toUriString();
+    public List<StatItem> stats(List<String> regions, String layer) {
+        String uri = UriComponentsBuilder.fromPath("/api/geo/stats").queryParam("regions", join(regions)).queryParam("layer", layer).build().toUriString();
         return body(client.get().uri(uri), new ParameterizedTypeReference<ApiResult<List<StatItem>>>() {
         });
     }
 
-    public List<SearchHit> search(String region, String keyword, String layer) {
+    public List<SearchHit> search(List<String> regions, String keyword, String layer) {
         UriComponentsBuilder builder = UriComponentsBuilder.fromPath("/api/geo/search")
-                .queryParam("region", region)
+                .queryParam("regions", join(regions))
                 .queryParam("keyword", keyword)
                 .queryParam("limit", 8);
         if (layer != null && !layer.isBlank()) {
@@ -46,9 +46,9 @@ public class GeoApi {
         });
     }
 
-    public AnalysisResult analyze(String region, String layer, double minLon, double minLat, double maxLon, double maxLat) {
+    public AnalysisResult analyze(List<String> regions, String layer, double minLon, double minLat, double maxLon, double maxLat) {
         String uri = UriComponentsBuilder.fromPath("/api/geo/analyze")
-                .queryParam("region", region)
+                .queryParam("regions", join(regions))
                 .queryParam("layer", layer)
                 .queryParam("minLon", minLon)
                 .queryParam("minLat", minLat)
@@ -70,5 +70,9 @@ public class GeoApi {
             throw new IllegalStateException(result == null ? "地图服务暂不可用" : result.message());
         }
         return result.data();
+    }
+
+    private static String join(List<String> regions) {
+        return regions == null || regions.isEmpty() ? "" : String.join(",", regions);
     }
 }

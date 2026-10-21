@@ -10,7 +10,8 @@ interface Props {
   visible: Record<string, boolean>
   filters: Record<string, string[] | undefined>
   markers: MarkerPoint[]
-  region: string
+  regionsKey: string
+  tileVersion: number
   flyToken: number
   center: [number, number]
   zoom: number
@@ -18,19 +19,21 @@ interface Props {
   onBounds: (bbox: [number, number, number, number]) => void
 }
 
-export default function MapView({ visible, filters, markers, region, flyToken, center, zoom, style, onBounds }: Props) {
+export default function MapView({ visible, filters, markers, regionsKey, tileVersion, flyToken, center, zoom, style, onBounds }: Props) {
   const container = useRef<HTMLDivElement>(null)
   const mapRef = useRef<Map | null>(null)
   const ready = useRef(false)
   const visibleRef = useRef(visible)
   const filtersRef = useRef(filters)
   const onBoundsRef = useRef(onBounds)
-  const regionRef = useRef(region)
+  const regionRef = useRef(regionsKey)
+  const tileVersionRef = useRef(tileVersion)
   const styleRef = useRef(style)
   visibleRef.current = visible
   filtersRef.current = filters
   onBoundsRef.current = onBounds
-  regionRef.current = region
+  regionRef.current = regionsKey
+  tileVersionRef.current = tileVersion
   styleRef.current = style
 
   useEffect(() => {
@@ -74,7 +77,7 @@ export default function MapView({ visible, filters, markers, region, flyToken, c
       for (const layer of LAYERS) {
         map.addSource(layer.id, {
           type: 'vector',
-          tiles: [tileUrl(regionRef.current, layer.id)],
+          tiles: [tileUrl(regionRef.current, tileVersionRef.current, layer.id)],
           minzoom: layer.minzoom,
           maxzoom: 16
         })
@@ -158,10 +161,10 @@ export default function MapView({ visible, filters, markers, region, flyToken, c
     for (const layer of LAYERS) {
       const source = map.getSource(layer.id)
       if (source instanceof VectorTileSource) {
-        source.setTiles([tileUrl(region, layer.id)])
+        source.setTiles([tileUrl(regionsKey, tileVersion, layer.id)])
       }
     }
-  }, [region])
+  }, [regionsKey, tileVersion])
 
   useEffect(() => {
     const map = mapRef.current
@@ -195,8 +198,8 @@ export default function MapView({ visible, filters, markers, region, flyToken, c
   )
 }
 
-function tileUrl(region: string, layer: string) {
-  return `${window.location.origin}/api/tiles/${layer}/{z}/{x}/{y}.pbf?region=${encodeURIComponent(region)}`
+function tileUrl(regionsKey: string, tileVersion: number, layer: string) {
+  return `${window.location.origin}/api/tiles/${layer}/{z}/{x}/{y}.pbf?regions=${encodeURIComponent(regionsKey)}&v=${tileVersion}`
 }
 
 function emptyCollection() {

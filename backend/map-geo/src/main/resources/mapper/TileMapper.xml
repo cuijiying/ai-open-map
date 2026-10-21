@@ -3,6 +3,10 @@
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.aomap.geo.mapper.TileMapper">
 
+    <select id="prepareRead" resultType="string">
+        SELECT set_config('lock_timeout', '10s', true) || set_config('statement_timeout', '120s', true)
+    </select>
+
     <select id="mvt" resultType="string">
         WITH bounds AS (
             SELECT ST_TileEnvelope(#{z}, #{x}, #{y}) AS g3857,
@@ -26,7 +30,10 @@
                    CAST(f.osm_id AS text) AS osm_id
               FROM osm_feature f
               CROSS JOIN bounds b
-             WHERE f.region_code = #{region}
+             WHERE f.region_code IN
+             <foreach collection="regions" item="code" open="(" separator="," close=")">
+                 #{code}
+             </foreach>
                AND f.layer = #{layer}
                AND f.geom &amp;&amp; b.g4326
             <if test="layer == 'highway'">

@@ -11,34 +11,6 @@
         SELECT COUNT(*) FROM osm_feature_stage
     </select>
 
-    <update id="disableStatementTimeout">
-        SET LOCAL statement_timeout = 0
-    </update>
-
-    <delete id="deleteRegion">
-        DELETE FROM osm_feature WHERE region_code = #{regionCode}
-    </delete>
-
-    <insert id="insertFromStage">
-        INSERT INTO osm_feature (osm_id, osm_type, layer, sub_type, name, props, geom, region_code, job_id)
-        SELECT osm_id,
-               osm_type,
-               layer,
-               sub_type,
-               NULLIF(name, ''),
-               CASE WHEN props IS NULL OR props = '' THEN NULL ELSE CAST(props AS jsonb) END,
-               ST_GeomFromText(wkt, 4326),
-               #{regionCode},
-               #{jobId}
-          FROM osm_feature_stage
-         WHERE wkt IS NOT NULL
-           AND wkt &lt;&gt; ''
-    </insert>
-
-    <update id="analyzeFeatures">
-        ANALYZE osm_feature
-    </update>
-
     <select id="countFeatures" resultType="long">
         SELECT COUNT(*) FROM osm_feature WHERE region_code = #{regionCode}
     </select>

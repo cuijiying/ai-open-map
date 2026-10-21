@@ -1,6 +1,6 @@
 # AI Open Map
 
-面向安徽省 OpenStreetMap 数据的本地 WebGIS。0.1 版本可以下载并解析 Geofabrik 的安徽 PBF，写入带 PostGIS 的 PostgreSQL，按图层输出矢量切片，并用中文指令操作地图。
+面向中国省级 OpenStreetMap 数据的本地 WebGIS。可以按省下载并解析 PBF，写入带 PostGIS 的 PostgreSQL，按图层输出矢量切片。地图可以同时显示多个省；某个省在下载、解析、入库时，切片服务仍读取已经发布的数据。也可以用中文指令操作地图。
 
 地图数据来自 OpenStreetMap，使用时需保留署名：[© OpenStreetMap contributors](https://www.openstreetmap.org/copyright)，许可为 ODbL。
 

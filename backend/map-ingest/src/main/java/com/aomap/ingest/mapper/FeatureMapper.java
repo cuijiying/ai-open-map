@@ -14,14 +14,6 @@ public interface FeatureMapper {
 
     long countStage();
 
-    int disableStatementTimeout();
-
-    int deleteRegion(@Param("regionCode") String regionCode);
-
-    int insertFromStage(@Param("jobId") long jobId, @Param("regionCode") String regionCode);
-
-    int analyzeFeatures();
-
     long countFeatures(@Param("regionCode") String regionCode);
 
     List<LayerCountRow> countByLayer(@Param("regionCode") String regionCode);

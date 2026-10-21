@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Layout, message } from 'antd'
 import { api } from './api'
 import ChatPanel from './components/ChatPanel'
@@ -12,6 +12,19 @@ import { emptyOverrides, isThemeId, loadMapStyle, loadThemeOverrides, paintLayer
 import { ChatMessage, ChatResponse, JobView, LayerCount, LogView, MapAction, MarkerPoint, RegionOption, SourceOption, SourceProbe } from './types'
 
 const SOURCE_KEY = 'aomap.downloadSource'
+const MAP_REGIONS_KEY = 'aomap.mapRegions'
+
+function loadMapRegions(): string[] | null {
+  try {
+    const raw = JSON.parse(localStorage.getItem(MAP_REGIONS_KEY) || 'null')
+    if (Array.isArray(raw) && raw.length > 0 && raw.every((item) => typeof item === 'string')) {
+      return raw
+    }
+  } catch {
+    return null
+  }
+  return null
+}
 
 function loadSourceId() {
   const saved = localStorage.getItem(SOURCE_KEY)
@@ -30,6 +43,9 @@ export default function App() {
   const [counts, setCounts] = useState<LayerCount[]>([])
   const [regions, setRegions] = useState<RegionOption[]>([])
   const [regionCode, setRegionCode] = useState('anhui')
+  const [mapRegions, setMapRegions] = useState<string[]>(() => loadMapRegions() ?? ['anhui'])
+  const [tileVersion, setTileVersion] = useState(0)
+  const opened = useRef(false)
   const [sources, setSources] = useState<SourceOption[]>([])
   const [sourceId, setSourceId] = useState(loadSourceId)
   const [probe, setProbe] = useState<SourceProbe | null>(null)
@@ -48,13 +64,14 @@ export default function App() {
   const [themeId, setThemeId] = useState<ThemeId>(() => loadMapStyle().themeId)
   const [styleOverrides, setStyleOverrides] = useState(() => loadMapStyle().overrides)
   const mapStyle = useMemo(() => resolveStyle(themeId, styleOverrides), [themeId, styleOverrides])
+  const regionsKey = useMemo(() => [...mapRegions].sort().join(','), [mapRegions])
   const swatches = useMemo(
     () => Object.fromEntries(LAYERS.map((layer) => [layer.id, swatchOf(mapStyle, layer.id)])),
     [mapStyle]
   )
 
-  const refreshLayers = useCallback(async (code: string) => {
-    setCounts(await api<LayerCount[]>(`/api/geo/layers?region=${encodeURIComponent(code)}`))
+  const refreshLayers = useCallback(async (codes: string[]) => {
+    setCounts(await api<LayerCount[]>(`/api/geo/layers?regions=${encodeURIComponent(codes.join(','))}`))
   }, [])
 
   const refreshRegions = useCallback(async () => {
@@ -91,11 +108,24 @@ export default function App() {
   }
 
   useEffect(() => {
+    if (!opened.current) {
+      return
+    }
+    localStorage.setItem(MAP_REGIONS_KEY, JSON.stringify(mapRegions))
+  }, [mapRegions])
+
+  useEffect(() => {
     refreshRegions().catch((error: Error) => message.error(error.message))
+  }, [refreshRegions])
+
+  useEffect(() => {
     refreshSources(regionCode).catch((error: Error) => message.error(error.message))
-    refreshLayers(regionCode).catch((error: Error) => message.error(error.message))
     refreshJob(regionCode).catch((error: Error) => message.error(error.message))
-  }, [refreshLayers, refreshRegions, refreshSources, refreshJob, regionCode])
+  }, [refreshSources, refreshJob, regionCode])
+
+  useEffect(() => {
+    refreshLayers(mapRegions).catch((error: Error) => message.error(error.message))
+  }, [refreshLayers, mapRegions])
 
   useEffect(() => {
     if (job?.status !== 'RUNNING') {
@@ -105,25 +135,68 @@ export default function App() {
       refreshJob(regionCode)
         .then((latest) => {
           if (latest && latest.status !== 'RUNNING') {
+            if (latest.status === 'SUCCESS') {
+              setTileVersion((value) => value + 1)
+            }
             refreshRegions().catch(() => undefined)
-            refreshLayers(regionCode).catch(() => undefined)
+            refreshLayers(mapRegions).catch(() => undefined)
           }
         })
         .catch(() => undefined)
     }, 2000)
     return () => window.clearInterval(timer)
-  }, [job?.status, regionCode, refreshJob, refreshLayers, refreshRegions])
+  }, [job?.status, regionCode, mapRegions, refreshJob, refreshLayers, refreshRegions])
+
+  function flyTo(items: RegionOption[]) {
+    if (items.length === 0) {
+      return
+    }
+    if (items.length === 1) {
+      setCenter([items[0].lon, items[0].lat])
+      setZoom(items[0].zoom)
+    } else {
+      const lons = items.map((item) => item.lon)
+      const lats = items.map((item) => item.lat)
+      const minLon = Math.min(...lons)
+      const maxLon = Math.max(...lons)
+      const minLat = Math.min(...lats)
+      const maxLat = Math.max(...lats)
+      const span = Math.max(maxLon - minLon, maxLat - minLat)
+      setCenter([(minLon + maxLon) / 2, (minLat + maxLat) / 2])
+      setZoom(span > 30 ? 3.6 : span > 18 ? 4.2 : span > 10 ? 5 : 5.6)
+    }
+    setFlyToken((value) => value + 1)
+  }
+
+  useEffect(() => {
+    if (opened.current || regions.length === 0) {
+      return
+    }
+    opened.current = true
+    const saved = loadMapRegions()
+    const withData = regions.filter((item) => item.featureCount > 0).map((item) => item.code)
+    const next = saved ?? (withData.length > 0 ? withData : ['anhui'])
+    setMapRegions(next)
+    flyTo(regions.filter((item) => next.includes(item.code)))
+  }, [regions])
 
   function showRegion(code: string) {
     const region = regions.find((item) => item.code === code)
     setRegionCode(code)
     setMarkers([])
+    setMapRegions((current) => current.includes(code) ? current : [...current, code])
     if (!region) {
       return
     }
     setCenter([region.lon, region.lat])
     setZoom(region.zoom)
     setFlyToken((value) => value + 1)
+  }
+
+  function changeMapRegions(codes: string[]) {
+    setMapRegions(codes)
+    setMarkers([])
+    flyTo(regions.filter((item) => codes.includes(item.code)))
   }
 
   function chooseSource(id: string) {
@@ -156,6 +229,7 @@ export default function App() {
         body: JSON.stringify({ regionCode, sourceId })
       })
       setJob(created)
+      setMapRegions((current) => current.includes(regionCode) ? current : [...current, regionCode])
       const sourceName = sources.find((item) => item.id === sourceId)?.name ?? ''
       message.success(`已开始从${sourceName}下载${region?.name ?? ''}数据`)
     } catch (error) {
@@ -235,7 +309,7 @@ export default function App() {
         method: 'POST',
         body: JSON.stringify({
           messages: history.map((item) => ({ role: item.role, content: item.content })),
-          map: { center, zoom, bbox, visibleLayers: Object.keys(visible).filter((key) => visible[key]), regionCode }
+          map: { center, zoom, bbox, visibleLayers: Object.keys(visible).filter((key) => visible[key]), regionCode, regions: mapRegions }
         })
       })
       applyActions(result.actions ?? [])
@@ -247,7 +321,16 @@ export default function App() {
     }
   }
 
-  const regionName = regions.find((item) => item.code === regionCode)?.name ?? '安徽省'
+  const regionName = useMemo(() => {
+    const names = mapRegions.map((code) => regions.find((item) => item.code === code)?.name ?? code)
+    if (names.length === 0) {
+      return '未选择省份'
+    }
+    if (names.length > 3) {
+      return `${names.slice(0, 3).join('、')}等 ${names.length} 个省`
+    }
+    return names.join('、')
+  }, [mapRegions, regions])
   const runningLabel = useMemo(() => job?.status === 'RUNNING' ? job.message : regionName, [job, regionName])
 
   return (
@@ -279,6 +362,8 @@ export default function App() {
           <JobPanel
             regions={regions}
             regionCode={regionCode}
+            mapRegions={mapRegions}
+            onMapRegionsChange={changeMapRegions}
             sources={sources}
             sourceId={sourceId}
             probe={probe}
@@ -297,7 +382,8 @@ export default function App() {
             visible={visible}
             filters={filters}
             markers={markers}
-            region={regionCode}
+            regionsKey={regionsKey}
+            tileVersion={tileVersion}
             flyToken={flyToken}
             center={center}
             zoom={zoom}

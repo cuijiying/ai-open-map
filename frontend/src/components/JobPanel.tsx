@@ -11,6 +11,8 @@ const PHASES = [
 interface Props {
   regions: RegionOption[]
   regionCode: string
+  mapRegions: string[]
+  onMapRegionsChange: (codes: string[]) => void
   sources: SourceOption[]
   sourceId: string
   probe: SourceProbe | null
@@ -29,8 +31,8 @@ function elapsedText(ms: number) {
 }
 
 export default function JobPanel({
-  regions, regionCode, sources, sourceId, probe, probing, job, logs, loading,
-  onRegionChange, onSourceChange, onTest, onStart
+  regions, regionCode, mapRegions, sources, sourceId, probe, probing, job, logs, loading,
+  onRegionChange, onMapRegionsChange, onSourceChange, onTest, onStart
 }: Props) {
   const running = job?.status === 'RUNNING'
   const current = Math.max(0, PHASES.findIndex((item) => item.key === job?.phase))
@@ -47,6 +49,22 @@ export default function JobPanel({
           下载
         </Button>
       </div>
+      <div className="field-label">地图上的省份</div>
+      <Select
+        className="region-select"
+        mode="multiple"
+        allowClear
+        showSearch
+        optionFilterProp="label"
+        maxTagCount={2}
+        value={mapRegions}
+        options={regions.map((item) => ({
+          value: item.code,
+          label: item.featureCount > 0 ? `${item.name} · 已入库` : item.name
+        }))}
+        onChange={onMapRegionsChange}
+      />
+      <div className="field-label">下载省份</div>
       <Select
         className="region-select"
         showSearch
@@ -86,15 +104,15 @@ export default function JobPanel({
           <span>{probe.message} · {elapsedText(probe.elapsedMs)}</span>
         </div>
       ) : null}
-      {running && job && job.regionCode !== regionCode ? (
+      {running && job ? (
         <Typography.Paragraph type="secondary" className="hint">
-          正在下载{job.regionName}，完成前不能开始新的省份任务。
+          正在处理{job.regionName}。下载、解析和建索引期间切片仍可使用，完成前不能开始另一个省份的下载。
         </Typography.Paragraph>
       ) : null}
       <Typography.Paragraph type="secondary" className="hint">
         {selectedRegion && selectedRegion.featureCount > 0
-          ? `${selectedRegion.name}已有 ${selectedRegion.featureCount.toLocaleString('zh-CN')} 条要素，切换后地图只展示该省。再次下载会替换该省数据，不影响其他省。`
-          : '该省尚未入库。下载完成后地图会展示这一省。每天 03:00 自动更新安徽省。'}
+          ? `${selectedRegion.name}已有 ${selectedRegion.featureCount.toLocaleString('zh-CN')} 条要素。地图可以同时显示多个省。再次下载只替换该省，其他省的切片不受影响。`
+          : '该省尚未入库。下载完成后可以和其他省一起显示。每天 03:00 默认定时更新安徽省。'}
       </Typography.Paragraph>
       {job && (
         <>

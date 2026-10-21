@@ -10,6 +10,7 @@ import com.aomap.common.dto.GeoDtos.LayerCount;
 import com.aomap.common.dto.GeoDtos.SearchHit;
 import com.aomap.common.dto.GeoDtos.StatItem;
 import com.aomap.common.geo.Layers;
+import com.aomap.common.geo.RegionSelection;
 import com.aomap.common.geo.Regions;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -77,7 +78,8 @@ public class ChatService {
     private void apply(FollowUp followUp, ChatRequest request, List<MapAction> actions, List<DataTable> tables, StringBuilder reply) {
         switch (followUp.kind()) {
             case "layers" -> {
-                List<LayerCount> layers = geoApi.layers(regionCode(request));
+                List<String> codes = regionCodes(request);
+                List<LayerCount> layers = geoApi.layers(codes);
                 List<List<Object>> rows = new ArrayList<>();
                 long total = 0;
                 for (LayerCount layer : layers) {
@@ -85,10 +87,10 @@ public class ChatService {
                     total += layer.count();
                 }
                 tables.add(new DataTable("图层数量", List.of("图层", "数量"), rows));
-                reply.append("\n").append(Regions.orDefault(regionCode(request)).name()).append("共 ").append(total).append(" 条要素。");
+                reply.append("\n").append(scopeName(codes)).append("共 ").append(total).append(" 条要素。");
             }
             case "stats" -> {
-                List<StatItem> items = geoApi.stats(regionCode(request), followUp.layer());
+                List<StatItem> items = geoApi.stats(regionCodes(request), followUp.layer());
                 List<List<Object>> rows = new ArrayList<>();
                 for (StatItem item : items) {
                     rows.add(List.of(item.subtype(), item.count()));
@@ -98,7 +100,7 @@ public class ChatService {
                         .append(items.stream().mapToLong(StatItem::count).sum()).append(" 条。");
             }
             case "search" -> {
-                List<SearchHit> hits = geoApi.search(regionCode(request), followUp.keyword(), followUp.layer());
+                List<SearchHit> hits = geoApi.search(regionCodes(request), followUp.keyword(), followUp.layer());
                 if (hits.isEmpty()) {
                     reply.append("\n没有找到“").append(followUp.keyword()).append("”。");
                     return;
@@ -117,7 +119,7 @@ public class ChatService {
             }
             case "analyze" -> {
                 double[] bbox = bbox(request);
-                AnalysisResult result = geoApi.analyze(regionCode(request), followUp.layer(), bbox[0], bbox[1], bbox[2], bbox[3]);
+                AnalysisResult result = geoApi.analyze(regionCodes(request), followUp.layer(), bbox[0], bbox[1], bbox[2], bbox[3]);
                 tables.add(new DataTable("视野统计", List.of("指标", "数值"), List.of(
                         List.of("数量", result.count()),
                         List.of("长度", formatLength(result.lengthMeters())),
@@ -203,6 +205,32 @@ public class ChatService {
         return request.map().regionCode();
     }
 
+    private static List<String> regionCodes(ChatRequest request) {
+        String regions = null;
+        String region = null;
+        if (request != null && request.map() != null) {
+            region = request.map().regionCode();
+            if (request.map().regions() != null) {
+                regions = String.join(",", request.map().regions());
+            }
+        }
+        try {
+            return RegionSelection.resolve(regions, region);
+        } catch (RuntimeException ex) {
+            return List.of(Regions.orDefault(region).code());
+        }
+    }
+
+    private static String scopeName(List<String> codes) {
+        if (codes.size() == 1) {
+            return Regions.require(codes.get(0)).name();
+        }
+        if (codes.isEmpty()) {
+            return "当前地图";
+        }
+        return codes.size() + "个省";
+    }
+
     private static String lastUserText(ChatRequest request) {
         if (request == null || request.messages() == null) {
             return "";
@@ -251,7 +279,7 @@ public class ChatService {
         public record Message(String role, String content) {
         }
 
-        public record MapContext(List<Double> center, Double zoom, List<Double> bbox, List<String> visibleLayers, String regionCode) {
+        public record MapContext(List<Double> center, Double zoom, List<Double> bbox, List<String> visibleLayers, String regionCode, List<String> regions) {
         }
     }
 
