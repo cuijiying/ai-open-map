@@ -12,6 +12,7 @@ import java.util.List;
 public class TileService {
 
     private final TileMapper tiles;
+    private final TileCache cache = new TileCache(400, 30_000);
 
     public TileService(TileMapper tiles) {
         this.tiles = tiles;
@@ -29,10 +30,15 @@ public class TileService {
         if (codes.isEmpty()) {
             return new byte[0];
         }
-        String encoded = tiles.mvt(codes, layer, z, x, y);
-        if (encoded == null || encoded.isBlank()) {
-            return new byte[0];
+        String key = layer + "/" + z + "/" + x + "/" + y + "/" + String.join(",", codes.stream().sorted().toList());
+        long now = System.currentTimeMillis();
+        byte[] cached = cache.get(key, now);
+        if (cached != null) {
+            return cached;
         }
-        return Base64.getMimeDecoder().decode(encoded);
+        String encoded = tiles.mvt(codes, layer, z, x, y);
+        byte[] body = encoded == null || encoded.isBlank() ? new byte[0] : Base64.getMimeDecoder().decode(encoded);
+        cache.put(key, body, now);
+        return body;
     }
 }

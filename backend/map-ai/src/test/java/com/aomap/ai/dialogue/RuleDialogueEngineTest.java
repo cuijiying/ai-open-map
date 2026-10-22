@@ -15,6 +15,8 @@ class RuleDialogueEngineTest {
         MapAction fly = hangzhou.actions().stream().filter(action -> "fly_to".equals(action.type())).findFirst().orElseThrow();
         assertEquals(120.155, fly.center().get(0), 0.01);
         assertEquals(30.274, fly.center().get(1), 0.01);
+        assertEquals("zhejiang", fly.regionCode());
+        assertTrue(hangzhou.reply().contains("浙江省"));
         DialoguePlan reset = engine.plan("重置地图", "zhejiang").orElseThrow();
         MapAction back = reset.actions().stream().filter(action -> "fly_to".equals(action.type())).findFirst().orElseThrow();
         assertEquals(120.20, back.center().get(0), 0.01);
@@ -27,6 +29,7 @@ class RuleDialogueEngineTest {
         MapAction fly = plan.actions().stream().filter(action -> "fly_to".equals(action.type())).findFirst().orElseThrow();
         assertEquals(117.227, fly.center().get(0), 0.01);
         assertEquals(31.821, fly.center().get(1), 0.01);
+        assertEquals("anhui", fly.regionCode());
     }
 
     @Test

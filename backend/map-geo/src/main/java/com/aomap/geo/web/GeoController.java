@@ -38,8 +38,19 @@ public class GeoController {
                                        @RequestParam(required = false) String region) {
         return ResponseEntity.ok()
                 .contentType(MVT)
-                .cacheControl(CacheControl.maxAge(Duration.ofMinutes(2)).cachePublic())
+                .cacheControl(CacheControl.maxAge(cacheFor(z)).cachePublic())
                 .body(tiles.tile(regionArgument(regions, region), layer, z, x, y));
+    }
+
+    /** 低缩放瓦片覆盖范围大、计算贵，而且发布后页面会用新的 v 参数绕过缓存。 */
+    private static Duration cacheFor(int z) {
+        if (z <= 6) {
+            return Duration.ofMinutes(10);
+        }
+        if (z <= 11) {
+            return Duration.ofMinutes(5);
+        }
+        return Duration.ofMinutes(2);
     }
 
     @GetMapping("/api/geo/layers")

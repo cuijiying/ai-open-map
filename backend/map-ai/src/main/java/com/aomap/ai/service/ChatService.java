@@ -109,9 +109,9 @@ public class ChatService {
                     markers.add(new MapAction.Marker(hit.name(), hit.layer(), hit.subtype(), hit.lon(), hit.lat()));
                     rows.add(List.of(hit.name(), hit.region() == null ? "" : hit.region(), Layers.label(hit.layer()), hit.subtype() == null ? "" : hit.subtype()));
                 }
-                actions.add(new MapAction("markers", null, null, null, null, null, markers));
+                actions.add(new MapAction("markers", null, null, null, null, null, markers, null));
                 SearchHit first = hits.get(0);
-                actions.add(new MapAction("fly_to", null, null, List.of(first.lon(), first.lat()), 13.0, first.name(), null));
+                actions.add(new MapAction("fly_to", null, null, List.of(first.lon(), first.lat()), 13.0, first.name(), null, blankToNull(first.regionCode())));
                 tables.add(new DataTable("查找结果", List.of("名称", "省份", "图层", "类型"), rows));
                 reply.append("\n找到 ").append(hits.size()).append(" 条，已定位到").append(first.name()).append("。");
             }
@@ -175,7 +175,15 @@ public class ChatService {
             center = List.of(node.path("center").get(0).asDouble(), node.path("center").get(1).asDouble());
         }
         Double zoom = node.has("zoom") ? node.path("zoom").asDouble() : null;
-        return new MapAction(type, layers.isEmpty() ? null : layers, null, center, zoom, text(node, "label"), null);
+        String regionCode = text(node, "regionCode");
+        if (regionCode != null && Regions.find(regionCode).isEmpty()) {
+            regionCode = null;
+        }
+        return new MapAction(type, layers.isEmpty() ? null : layers, null, center, zoom, text(node, "label"), null, regionCode);
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 
     private List<LlmClient.Message> prompt(ChatRequest request, String text) {

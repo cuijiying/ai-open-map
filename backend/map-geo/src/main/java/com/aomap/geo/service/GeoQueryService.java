@@ -69,7 +69,8 @@ public class GeoQueryService {
                     row.getName(),
                     row.getLon() == null ? 0 : row.getLon(),
                     row.getLat() == null ? 0 : row.getLat(),
-                    regionName
+                    regionName,
+                    row.getRegionCode()
             ));
         }
         return hits;

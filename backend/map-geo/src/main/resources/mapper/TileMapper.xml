@@ -11,11 +11,18 @@
         rows AS (
             SELECT ST_AsMVTGeom(
                        ST_Transform(
-                           CASE
-                               WHEN #{z} &lt;= 8 THEN ST_SimplifyPreserveTopology(f.geom, 0.002)
-                               WHEN #{z} &lt;= 11 THEN ST_SimplifyPreserveTopology(f.geom, 0.00035)
-                               ELSE f.geom
-                           END,
+                           <choose>
+                               <when test="layer == 'place' or layer == 'poi'">
+                                   f.geom
+                               </when>
+                               <otherwise>
+                                   CASE
+                                       WHEN #{z} &lt;= 8 THEN ST_SimplifyPreserveTopology(f.geom, 0.002)
+                                       WHEN #{z} &lt;= 11 THEN ST_SimplifyPreserveTopology(f.geom, 0.00035)
+                                       ELSE f.geom
+                                   END
+                               </otherwise>
+                           </choose>,
                            3857
                        ),
                        b.g3857, 4096, 64, true

@@ -12,6 +12,7 @@ interface Props {
   markers: MarkerPoint[]
   regions: string[]
   regionNames: Record<string, string>
+  notice?: string
   tileRevision: number
   flyToken: number
   bounds: [[number, number], [number, number]] | null
@@ -23,7 +24,7 @@ interface Props {
 }
 
 export default function MapView({
-  visible, filters, markers, regions, regionNames, tileRevision, flyToken, bounds, boundsToken, center, zoom, style, onBounds
+  visible, filters, markers, regions, regionNames, notice, tileRevision, flyToken, bounds, boundsToken, center, zoom, style, onBounds
 }: Props) {
   const container = useRef<HTMLDivElement>(null)
   const mapRef = useRef<Map | null>(null)
@@ -209,6 +210,7 @@ export default function MapView({
   return (
     <div className="map-root">
       <div ref={container} className="map-canvas" />
+      {notice ? <div className="map-notice">{notice}</div> : null}
       <div className="map-attrib">{attributionOf(style.basemap)}</div>
     </div>
   )
