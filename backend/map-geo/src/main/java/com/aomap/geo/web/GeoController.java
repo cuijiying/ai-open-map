@@ -7,11 +7,15 @@ import com.aomap.common.dto.GeoDtos.SearchHit;
 import com.aomap.common.dto.GeoDtos.StatItem;
 import com.aomap.geo.service.GeoQueryService;
 import com.aomap.geo.service.TileService;
+import com.aomap.geo.tile.PrebuildStatus;
+import com.aomap.geo.tile.TileWarmupService;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -25,10 +29,12 @@ public class GeoController {
 
     private final TileService tiles;
     private final GeoQueryService queries;
+    private final TileWarmupService warmup;
 
-    public GeoController(TileService tiles, GeoQueryService queries) {
+    public GeoController(TileService tiles, GeoQueryService queries, TileWarmupService warmup) {
         this.tiles = tiles;
         this.queries = queries;
+        this.warmup = warmup;
     }
 
     @GetMapping(value = "/api/tiles/{layer}/{z}/{x}/{y}.pbf")
@@ -51,6 +57,19 @@ public class GeoController {
             return Duration.ofMinutes(5);
         }
         return Duration.ofMinutes(2);
+    }
+
+    @PostMapping("/api/geo/tiles/prebuild")
+    public ApiResult<PrebuildStatus> startPrebuild(@RequestBody(required = false) PrebuildRequest request) {
+        int maxZoom = request == null || request.maxZoom() == null
+                ? TileWarmupService.defaultMaxZoom()
+                : request.maxZoom();
+        return ApiResult.ok(warmup.start(maxZoom));
+    }
+
+    @GetMapping("/api/geo/tiles/prebuild")
+    public ApiResult<PrebuildStatus> prebuildStatus() {
+        return ApiResult.ok(warmup.status());
     }
 
     @GetMapping("/api/geo/layers")
@@ -84,6 +103,9 @@ public class GeoController {
                                              @RequestParam double maxLon,
                                              @RequestParam double maxLat) {
         return ApiResult.ok(queries.analyze(regionArgument(regions, region), layer, minLon, minLat, maxLon, maxLat));
+    }
+
+    public record PrebuildRequest(Integer maxZoom) {
     }
 
     private static String regionArgument(String regions, String region) {

@@ -41,7 +41,7 @@ public class JobRepository {
         try {
             jobs.insertRunning(job);
         } catch (DuplicateKeyException ex) {
-            throw new IllegalStateException("已有下载入库任务正在执行");
+            throw new IllegalStateException("该省已有入库任务正在执行，其他省可以同时下载");
         }
         if (job.getId() == null) {
             throw new IllegalStateException("创建任务失败");

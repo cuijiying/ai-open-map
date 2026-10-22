@@ -14,6 +14,7 @@ public class OsmIngestProperties {
     private String userAgent = "AIOpenMap/0.1 (local WebGIS)";
     private boolean includeBuildings = true;
     private String scheduleRegion = "anhui";
+    private int parallelism = 2;
     private List<Region> regions = new ArrayList<>();
 
     public String getDataDir() {
@@ -62,6 +63,14 @@ public class OsmIngestProperties {
 
     public void setScheduleRegion(String scheduleRegion) {
         this.scheduleRegion = scheduleRegion;
+    }
+
+    public int getParallelism() {
+        return parallelism;
+    }
+
+    public void setParallelism(int parallelism) {
+        this.parallelism = parallelism;
     }
 
     public List<Region> getRegions() {

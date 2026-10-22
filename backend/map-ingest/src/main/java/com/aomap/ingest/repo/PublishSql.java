@@ -32,7 +32,7 @@ public final class PublishSql {
                     geom geometry(Geometry, 4326) NOT NULL,
                     region_code VARCHAR(32) NOT NULL,
                     job_id BIGINT,
-                    CONSTRAINT %s_type CHECK (osm_type IN ('node', 'way')),
+                    CONSTRAINT %s_type CHECK (osm_type IN ('node', 'way', 'relation')),
                     CONSTRAINT %s_layer CHECK (layer IN (%s)),
                     CONSTRAINT %s_part CHECK (region_code = '%s')
                 )
@@ -53,7 +53,8 @@ public final class PublishSql {
                        ?,
                        ?
                   FROM osm_feature_stage
-                 WHERE wkt IS NOT NULL
+                 WHERE job_id = ?
+                   AND wkt IS NOT NULL
                    AND wkt <> ''
                 """.formatted(table);
     }

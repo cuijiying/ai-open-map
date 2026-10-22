@@ -10,9 +10,9 @@ import java.util.List;
 @Mapper
 public interface FeatureMapper {
 
-    int truncateStage();
+    int deleteStage(@Param("jobId") long jobId);
 
-    long countStage();
+    long countStage(@Param("jobId") long jobId);
 
     long countFeatures(@Param("regionCode") String regionCode);
 

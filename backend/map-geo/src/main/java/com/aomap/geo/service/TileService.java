@@ -3,6 +3,7 @@ package com.aomap.geo.service;
 import com.aomap.common.geo.Layers;
 import com.aomap.common.geo.Regions;
 import com.aomap.geo.mapper.TileMapper;
+import com.aomap.geo.tile.NationalTileStore;
 import org.springframework.stereotype.Service;
 
 import java.util.Base64;
@@ -12,10 +13,12 @@ import java.util.List;
 public class TileService {
 
     private final TileMapper tiles;
+    private final NationalTileStore nationalTiles;
     private final TileCache cache = new TileCache(400, 30_000);
 
-    public TileService(TileMapper tiles) {
+    public TileService(TileMapper tiles, NationalTileStore nationalTiles) {
         this.tiles = tiles;
+        this.nationalTiles = nationalTiles;
     }
 
     public byte[] tile(String regions, String layer, int z, int x, int y) {
@@ -36,9 +39,25 @@ public class TileService {
         if (cached != null) {
             return cached;
         }
+        byte[] prepared = preparedTile(codes, layer, z, x, y);
+        if (prepared != null) {
+            cache.put(key, prepared, now);
+            return prepared;
+        }
         String encoded = tiles.mvt(codes, layer, z, x, y);
         byte[] body = encoded == null || encoded.isBlank() ? new byte[0] : Base64.getMimeDecoder().decode(encoded);
         cache.put(key, body, now);
         return body;
+    }
+
+    private byte[] preparedTile(List<String> codes, String layer, int z, int x, int y) {
+        try {
+            if (!nationalTiles.matches(codes, layer, z)) {
+                return null;
+            }
+            return nationalTiles.read(layer, z, x, y);
+        } catch (RuntimeException ex) {
+            return null;
+        }
     }
 }

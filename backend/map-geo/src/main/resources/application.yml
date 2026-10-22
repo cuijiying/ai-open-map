@@ -33,6 +33,10 @@ management:
       exposure:
         include: health,info
 
+app:
+  tiles:
+    dir: ${TILE_DIR:data/tiles}
+
 logging:
   charset:
     console: UTF-8
