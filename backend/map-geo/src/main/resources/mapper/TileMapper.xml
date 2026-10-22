@@ -89,4 +89,10 @@
           FROM rows
          WHERE geom IS NOT NULL
     </select>
+
+    <select id="publishedRegions" resultType="string">
+        SELECT DISTINCT region_code
+          FROM osm_feature
+         ORDER BY 1
+    </select>
 </mapper>

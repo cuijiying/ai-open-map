@@ -5,6 +5,8 @@ logs/
 data/osm/*.pbf
 data/osm/*.part
 data/osm/*.md5
+data/tiles/**
+!data/tiles/.gitkeep
 .idea/
 .vscode/
 *.iml

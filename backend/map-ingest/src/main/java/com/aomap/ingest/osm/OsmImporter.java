@@ -5,13 +5,17 @@ import com.aomap.ingest.repo.FeatureRepository.StagedFeature;
 import com.aomap.ingest.service.IngestProgress;
 import crosby.binary.osmosis.OsmosisReader;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import org.openstreetmap.osmosis.core.container.v0_6.EntityContainer;
 import org.openstreetmap.osmosis.core.container.v0_6.EntityProcessor;
 import org.openstreetmap.osmosis.core.container.v0_6.NodeContainer;
 import org.openstreetmap.osmosis.core.container.v0_6.RelationContainer;
 import org.openstreetmap.osmosis.core.container.v0_6.WayContainer;
 import org.openstreetmap.osmosis.core.domain.v0_6.Entity;
+import org.openstreetmap.osmosis.core.domain.v0_6.EntityType;
 import org.openstreetmap.osmosis.core.domain.v0_6.Node;
+import org.openstreetmap.osmosis.core.domain.v0_6.Relation;
+import org.openstreetmap.osmosis.core.domain.v0_6.RelationMember;
 import org.openstreetmap.osmosis.core.domain.v0_6.Tag;
 import org.openstreetmap.osmosis.core.domain.v0_6.Way;
 import org.openstreetmap.osmosis.core.domain.v0_6.WayNode;
@@ -43,10 +47,18 @@ public class OsmImporter {
     }
 
     public long importFile(Path file, long jobId, String regionCode, boolean includeBuildings, IngestProgress progress) throws IOException {
-        features.truncateStage();
+        features.deleteStage(jobId);
+        try {
+            return importParsed(file, jobId, regionCode, includeBuildings, progress);
+        } finally {
+            features.deleteStage(jobId);
+        }
+    }
+
+    private long importParsed(Path file, long jobId, String regionCode, boolean includeBuildings, IngestProgress progress) throws IOException {
         long length = Files.size(file);
         CountingInputStream input = new CountingInputStream(Files.newInputStream(file));
-        ParserSink sink = new ParserSink(includeBuildings, length, input, progress);
+        ParserSink sink = new ParserSink(jobId, includeBuildings, length, input, progress);
         try (input) {
             OsmosisReader reader = new OsmosisReader(input);
             reader.setSink(sink);
@@ -55,8 +67,8 @@ public class OsmImporter {
         if (sink.failure != null) {
             throw new IllegalStateException("解析 OSM 失败: " + sink.failure.getMessage(), sink.failure);
         }
-        long staged = features.countStage();
-        log.info("解析完成，缓冲要素 {} 条，跳过 {}", staged, sink.skipped);
+        long staged = features.countStage(jobId);
+        log.info("解析完成，缓冲要素 {} 条，关系面 {} 条，跳过 {}", staged, sink.relationCount, sink.skipped);
         if (staged == 0) {
             throw new IllegalStateException("没有解析到可入库的要素");
         }
@@ -79,21 +91,26 @@ public class OsmImporter {
     }
 
     private final class ParserSink implements Sink {
+        private final long jobId;
         private final boolean includeBuildings;
         private final long fileLength;
         private final CountingInputStream input;
         private final IngestProgress progress;
         private final List<StagedFeature> batch = new ArrayList<>(BATCH);
         private Long2LongOpenHashMap nodes = new Long2LongOpenHashMap(4_000_000);
+        private Long2ObjectOpenHashMap<long[]> ways = new Long2ObjectOpenHashMap<>();
         private long nodeCount;
         private long featureCount;
+        private long relationCount;
         private long skipped;
         private int lastPercent = 20;
         private boolean waysStarted;
+        private boolean wayMemoryFull;
         private boolean flushed;
         private Exception failure;
 
-        private ParserSink(boolean includeBuildings, long fileLength, CountingInputStream input, IngestProgress progress) {
+        private ParserSink(long jobId, boolean includeBuildings, long fileLength, CountingInputStream input, IngestProgress progress) {
+            this.jobId = jobId;
             this.includeBuildings = includeBuildings;
             this.fileLength = Math.max(fileLength, 1);
             this.input = input;
@@ -125,6 +142,7 @@ public class OsmImporter {
 
                 @Override
                 public void process(RelationContainer relationContainer) {
+                    onRelation(relationContainer.getEntity());
                 }
             });
         }
@@ -164,6 +182,7 @@ public class OsmImporter {
         }
 
         private void onWay(Way way) {
+            rememberWay(way);
             if (!waysStarted) {
                 waysStarted = true;
                 progress.report("PARSE", Math.max(lastPercent, 35), "节点读取完成，共 " + nodeCount + " 个，开始生成线、面要素");
@@ -174,6 +193,10 @@ public class OsmImporter {
                 List<double[]> coordinates = new ArrayList<>(way.getWayNodes().size());
                 boolean complete = true;
                 for (WayNode wayNode : way.getWayNodes()) {
+                    if (nodes == null) {
+                        complete = false;
+                        break;
+                    }
                     long packed = nodes.get(wayNode.getNodeId());
                     if (packed == Long.MIN_VALUE) {
                         complete = false;
@@ -192,6 +215,68 @@ public class OsmImporter {
                 }
             }
             tick("正在解析，节点 " + nodeCount + "，要素 " + featureCount);
+        }
+
+        private void rememberWay(Way way) {
+            if (ways == null || nodes == null || wayMemoryFull || way.getWayNodes().size() < 2 || way.getWayNodes().size() > 8000) {
+                return;
+            }
+            if (ways.size() >= 1_500_000) {
+                wayMemoryFull = true;
+                log.warn("道路几何已缓存 {} 条，其余关系成员不再保留", ways.size());
+                return;
+            }
+            long[] packed = new long[way.getWayNodes().size()];
+            int count = 0;
+            for (WayNode wayNode : way.getWayNodes()) {
+                long value = nodes.get(wayNode.getNodeId());
+                if (value == Long.MIN_VALUE) {
+                    return;
+                }
+                packed[count++] = value;
+            }
+            ways.put(way.getId(), packed);
+        }
+
+        private void onRelation(Relation relation) {
+            if (nodes != null) {
+                nodes = null;
+            }
+            if (ways == null) {
+                return;
+            }
+            Map<String, String> tags = tags(relation);
+            OsmTagClassifier.Kind kind = tags.isEmpty() ? null : OsmTagClassifier.classifyRelation(tags, includeBuildings);
+            if (kind == null) {
+                return;
+            }
+            List<List<double[]>> outers = new ArrayList<>();
+            List<List<double[]>> inners = new ArrayList<>();
+            for (RelationMember member : relation.getMembers()) {
+                if (member.getMemberType() != EntityType.Way) {
+                    continue;
+                }
+                long[] packed = ways.get(member.getMemberId());
+                if (packed == null) {
+                    continue;
+                }
+                List<double[]> line = new ArrayList<>(packed.length);
+                for (long value : packed) {
+                    line.add(new double[]{unpackLon(value), unpackLat(value)});
+                }
+                if ("inner".equals(member.getMemberRole())) {
+                    inners.add(line);
+                } else {
+                    outers.add(line);
+                }
+            }
+            String wkt = RelationGeometry.areaWkt(outers, inners);
+            if (wkt == null) {
+                skipped++;
+                return;
+            }
+            relationCount++;
+            accept(relation.getId(), "relation", kind, OsmTagClassifier.nameOf(tags), OsmTagClassifier.propsJson(tags), wkt);
         }
 
         private void accept(long osmId, String osmType, OsmTagClassifier.Kind kind, String name, String props, String wkt) {
@@ -221,12 +306,13 @@ public class OsmImporter {
                 }
                 flushed = true;
                 nodes = null;
+                ways = null;
             }
             if (batch.isEmpty()) {
                 return;
             }
             try {
-                features.copy(new ArrayList<>(batch));
+                features.copy(this.jobId, new ArrayList<>(batch));
                 batch.clear();
             } catch (RuntimeException ex) {
                 failure = ex;

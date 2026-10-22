@@ -73,6 +73,21 @@ public final class OsmTagClassifier {
         return null;
     }
 
+    public static Kind classifyRelation(Map<String, String> tags, boolean includeBuildings) {
+        String type = tags.get("type");
+        if (!"multipolygon".equals(type) && !"boundary".equals(type)) {
+            return null;
+        }
+        Kind kind = classifyWay(tags, includeBuildings);
+        if (kind == null) {
+            return null;
+        }
+        if (!kind.polygon() && !"boundary".equals(kind.layer())) {
+            return null;
+        }
+        return new Kind(kind.layer(), kind.subType(), true);
+    }
+
     public static Kind classifyNode(Map<String, String> tags) {
         String place = tags.get("place");
         if (place != null && PLACE_TYPES.contains(place)) {

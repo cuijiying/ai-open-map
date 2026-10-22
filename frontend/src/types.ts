@@ -60,6 +60,16 @@ export function sourceLabel(url?: string) {
   return '其他源'
 }
 
+export interface PrebuildStatus {
+  state: 'IDLE' | 'RUNNING' | 'SUCCESS' | 'FAILED' | string
+  progress: number
+  message?: string
+  maxZoom?: number
+  regions?: string[]
+  layers?: string[]
+  tileCount?: number
+}
+
 export interface LogView {
   id: number
   phase: string

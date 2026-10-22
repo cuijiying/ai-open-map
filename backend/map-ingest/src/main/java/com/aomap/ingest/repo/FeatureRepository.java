@@ -25,7 +25,7 @@ public class FeatureRepository {
 
     private static final Logger log = LoggerFactory.getLogger(FeatureRepository.class);
     private static final String COPY_SQL = """
-            COPY osm_feature_stage (osm_id, osm_type, layer, sub_type, name, props, wkt)
+            COPY osm_feature_stage (osm_id, osm_type, layer, sub_type, name, props, wkt, job_id)
             FROM STDIN WITH (FORMAT csv)
             """;
 
@@ -39,11 +39,11 @@ public class FeatureRepository {
         this.schema = schema;
     }
 
-    public void truncateStage() {
-        features.truncateStage();
+    public void deleteStage(long jobId) {
+        features.deleteStage(jobId);
     }
 
-    public void copy(List<StagedFeature> rows) {
+    public void copy(long jobId, List<StagedFeature> rows) {
         if (rows.isEmpty()) {
             return;
         }
@@ -55,7 +55,8 @@ public class FeatureRepository {
                     .append(csv(row.subType())).append(',')
                     .append(csv(row.name())).append(',')
                     .append(csv(row.props())).append(',')
-                    .append(csv(row.wkt()))
+                    .append(csv(row.wkt())).append(',')
+                    .append(jobId)
                     .append('\n');
         }
         try (Connection connection = dataSource.getConnection()) {
@@ -66,8 +67,8 @@ public class FeatureRepository {
         }
     }
 
-    public long countStage() {
-        return features.countStage();
+    public long countStage(long jobId) {
+        return features.countStage(jobId);
     }
 
     public long countStored(String regionCode) {
@@ -106,6 +107,7 @@ public class FeatureRepository {
                 try (PreparedStatement statement = connection.prepareStatement(PublishSql.insertBuild(table))) {
                     statement.setString(1, code);
                     statement.setLong(2, jobId);
+                    statement.setLong(3, jobId);
                     count = statement.executeUpdate();
                 }
                 connection.commit();

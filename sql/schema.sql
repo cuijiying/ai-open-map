@@ -32,14 +32,15 @@ CREATE TABLE IF NOT EXISTS ingest_job (
     CONSTRAINT ck_ingest_job_progress CHECK (progress >= 0 AND progress <= 100)
 );
 
-COMMENT ON TABLE ingest_job IS 'OSM 下载、解析、入库任务。同一时刻只允许一条 RUNNING 记录';
+COMMENT ON TABLE ingest_job IS 'OSM 下载、解析、入库任务。同一省份同时只允许一条 RUNNING 记录，不同省可以并行';
 COMMENT ON COLUMN ingest_job.phase IS 'DOWNLOAD 下载 / PARSE 解析 / IMPORT 入库 / INDEX 建索引 / SUCCESS / FAILED';
 COMMENT ON COLUMN ingest_job.trigger_type IS 'MANUAL 页面触发 / SCHEDULE 定时任务';
 COMMENT ON COLUMN ingest_job.layer_counts IS '各图层要素数量，例如 {"highway":1200,"poi":80}';
 
--- 部分唯一索引：status 同为 RUNNING 时只允许一行
-CREATE UNIQUE INDEX IF NOT EXISTS uq_ingest_job_running
-    ON ingest_job (status)
+-- 旧库曾限制全局只能有一条 RUNNING。启动时删掉它，改成按省互斥。
+DROP INDEX IF EXISTS uq_ingest_job_running;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_ingest_job_running_region
+    ON ingest_job (region_code)
     WHERE status = 'RUNNING';
 
 CREATE INDEX IF NOT EXISTS idx_ingest_job_created
@@ -79,7 +80,7 @@ CREATE TABLE IF NOT EXISTS osm_feature (
     region_code VARCHAR(32)  NOT NULL,
     job_id      BIGINT,
     CONSTRAINT pk_osm_feature PRIMARY KEY (id, region_code),
-    CONSTRAINT ck_osm_feature_type CHECK (osm_type IN ('node', 'way')),
+    CONSTRAINT ck_osm_feature_type CHECK (osm_type IN ('node', 'way', 'relation')),
     CONSTRAINT ck_osm_feature_layer CHECK (layer IN (
         'highway', 'railway', 'waterway', 'water',
         'building', 'landuse', 'boundary', 'poi', 'place'
@@ -91,7 +92,7 @@ ALTER SEQUENCE osm_feature_id_seq OWNED BY osm_feature.id;
 COMMENT ON TABLE osm_feature IS '按省分区的 OSM 要素。地图服务按图层输出矢量切片，一次可以包含多个省；发布时整省替换分区';
 COMMENT ON COLUMN osm_feature.layer IS 'highway 道路 / railway 铁路 / waterway 水系线 / water 水体 / building 建筑 / landuse 土地利用 / boundary 行政区划 / poi 兴趣点 / place 地名';
 COMMENT ON COLUMN osm_feature.sub_type IS '图层内分类，例如 highway=primary、amenity=school';
-COMMENT ON COLUMN osm_feature.geom IS 'WGS84 几何。道路、水系、铁路、边界为线，建筑、用地、水体为面，地名和兴趣点为点';
+COMMENT ON COLUMN osm_feature.geom IS 'WGS84 几何。道路、水系、铁路多为线，建筑、用地、水体和关系面为面，地名和兴趣点为点，行政区划可以是线或面';
 COMMENT ON COLUMN osm_feature.props IS '保留的常用 OSM 标签';
 
 CREATE INDEX IF NOT EXISTS idx_osm_feature_geom
@@ -111,6 +112,10 @@ CREATE INDEX IF NOT EXISTS idx_osm_feature_region
     ON osm_feature (region_code, layer);
 COMMENT ON COLUMN osm_feature.region_code IS '省级区域代码，与数据文件名一致，例如 anhui、zhejiang、guangdong';
 
+ALTER TABLE osm_feature DROP CONSTRAINT IF EXISTS ck_osm_feature_type;
+ALTER TABLE osm_feature DROP CONSTRAINT IF EXISTS ck_osm_feature_next_type;
+ALTER TABLE osm_feature ADD CONSTRAINT ck_osm_feature_type CHECK (osm_type IN ('node', 'way', 'relation'));
+
 -- 解析缓冲。切片不读这张表。发布时再写入该省独立缓冲表，建好索引后短事务换分区。
 CREATE UNLOGGED TABLE IF NOT EXISTS osm_feature_stage (
     osm_id   BIGINT,
@@ -119,10 +124,14 @@ CREATE UNLOGGED TABLE IF NOT EXISTS osm_feature_stage (
     sub_type VARCHAR(64),
     name     TEXT,
     props    TEXT,
-    wkt      TEXT
+    wkt      TEXT,
+    job_id   BIGINT
 );
 
-COMMENT ON TABLE osm_feature_stage IS '解析缓冲表，无索引。切片不读这张表；发布时先灌进该省缓冲表，再换分区';
+ALTER TABLE osm_feature_stage ADD COLUMN IF NOT EXISTS job_id BIGINT;
+CREATE INDEX IF NOT EXISTS idx_osm_feature_stage_job ON osm_feature_stage (job_id);
+
+COMMENT ON TABLE osm_feature_stage IS '解析缓冲表。多个省可以同时写入，用 job_id 分开；切片不读这张表';
 
 -- ---------------------------------------------------------------------------
 -- 对话模型

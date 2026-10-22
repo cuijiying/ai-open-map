@@ -1,5 +1,5 @@
 import { Button, List, Progress, Select, Steps, Tag, Typography } from 'antd'
-import { JobView, LogView, RegionOption, SourceOption, SourceProbe, sourceLabel } from '../types'
+import { JobView, LogView, PrebuildStatus, RegionOption, SourceOption, SourceProbe, sourceLabel } from '../types'
 
 const PHASES = [
   { key: 'DOWNLOAD', title: '下载' },
@@ -19,6 +19,10 @@ interface Props {
   job: JobView | null
   logs: LogView[]
   loading: boolean
+  activeCount: number
+  prebuild: PrebuildStatus | null
+  prebuilding: boolean
+  onPrebuild: () => void
   onRegionChange: (code: string) => void
   onMapRegionsChange: (codes: string[]) => void
   onFit: () => void
@@ -34,9 +38,11 @@ function elapsedText(ms: number) {
 
 export default function JobPanel({
   regions, regionCode, mapRegions, sources, sourceId, probe, probing, job, logs, loading,
+  activeCount, prebuild, prebuilding, onPrebuild,
   onRegionChange, onMapRegionsChange, onFit, onLocate, onSourceChange, onTest, onStart
 }: Props) {
-  const running = job?.status === 'RUNNING'
+  const selectedRunning = job?.status === 'RUNNING' && job.regionCode === regionCode
+  const running = selectedRunning
   const current = Math.max(0, PHASES.findIndex((item) => item.key === job?.phase))
   const selectedRegion = regions.find((item) => item.code === regionCode)
   const selectedSource = sources.find((item) => item.id === sourceId)
@@ -67,6 +73,21 @@ export default function JobPanel({
       <Typography.Paragraph type="secondary" className="hint">
         可以同时勾选多个省，矢量切片会把这些省画在同一张地图上。图层数量是所选省份的合计。
       </Typography.Paragraph>
+      <div className="panel-title">
+        <span>低缩放瓦片</span>
+        <Button size="small" loading={prebuilding || prebuild?.state === 'RUNNING'} disabled={prebuild?.state === 'RUNNING'} onClick={onPrebuild}>
+          预生成
+        </Button>
+      </div>
+      <Typography.Paragraph type="secondary" className="hint">
+        按当前已入库的省份，把全国范围 z0–z6 的道路、水体、边界和地名写成文件。地图勾选的省份和生成时一致时，这些缩放直接读文件。
+      </Typography.Paragraph>
+      {prebuild && prebuild.state !== 'IDLE' ? (
+        <>
+          {prebuild.state === 'RUNNING' ? <Progress percent={prebuild.progress} size="small" status="active" /> : null}
+          <div className="job-message">{prebuild.message}</div>
+        </>
+      ) : null}
       <div className="panel-title">
         <span>数据入库</span>
         <Button type="primary" size="small" loading={loading || running} disabled={running} onClick={onStart}>
@@ -117,7 +138,11 @@ export default function JobPanel({
       ) : null}
       {running && job ? (
         <Typography.Paragraph type="secondary" className="hint">
-          正在处理{job.regionName}。下载、解析和建索引不改已发布的地图，完成前不能再开始另一个入库任务。
+          正在处理{job.regionName}。下载、解析和建索引不改已发布的地图。同一省不能同时入库两次，其他省可以同时下载。
+        </Typography.Paragraph>
+      ) : activeCount > 0 ? (
+        <Typography.Paragraph type="secondary" className="hint">
+          还有 {activeCount} 个省正在入库。当前选择的省可以同时开始。
         </Typography.Paragraph>
       ) : null}
       <Typography.Paragraph type="secondary" className="hint">

@@ -35,11 +35,7 @@ public class IngestService {
     private final FeatureRepository features;
     private final OsmDownloader downloader;
     private final OsmImporter importer;
-    private final ExecutorService executor = Executors.newSingleThreadExecutor(runnable -> {
-        Thread thread = new Thread(runnable, "osm-ingest");
-        thread.setDaemon(true);
-        return thread;
-    });
+    private final ExecutorService executor;
 
     public IngestService(
             OsmIngestProperties properties,
@@ -53,6 +49,12 @@ public class IngestService {
         this.features = features;
         this.downloader = downloader;
         this.importer = importer;
+        int pool = Math.max(1, Math.min(properties.getParallelism(), 4));
+        this.executor = Executors.newFixedThreadPool(pool, runnable -> {
+            Thread thread = new Thread(runnable, "osm-ingest");
+            thread.setDaemon(true);
+            return thread;
+        });
         jobs.failStaleRunning();
     }
 

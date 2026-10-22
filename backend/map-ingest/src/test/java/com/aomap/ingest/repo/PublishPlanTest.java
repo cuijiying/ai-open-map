@@ -29,6 +29,7 @@ class PublishPlanTest {
         assertEquals("osm_feature_b_zhejiang", table);
         assertTrue(sql.contains("INSERT INTO osm_feature_b_zhejiang"));
         assertTrue(sql.contains("FROM osm_feature_stage"));
+        assertTrue(sql.contains("job_id = ?"));
         assertFalse(sql.contains("DELETE FROM osm_feature"));
         assertFalse(sql.contains("TRUNCATE osm_feature"));
     }

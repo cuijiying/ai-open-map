@@ -9,7 +9,7 @@ import ModelModal from './components/ModelModal'
 import StylePanel from './components/StylePanel'
 import { DEFAULT_VISIBLE, LAYERS } from './layers'
 import { emptyOverrides, isThemeId, loadMapStyle, loadThemeOverrides, paintLayers, resetStoredStyles, resolveStyle, saveMapStyle, swatchOf, ThemeId } from './mapStyle'
-import { ChatMessage, ChatResponse, JobView, LayerCount, LogView, MapAction, MarkerPoint, RegionOption, SourceOption, SourceProbe } from './types'
+import { ChatMessage, ChatResponse, JobView, LayerCount, LogView, MapAction, MarkerPoint, PrebuildStatus, RegionOption, SourceOption, SourceProbe } from './types'
 
 const SOURCE_KEY = 'aomap.downloadSource'
 const MAP_REGIONS_KEY = 'aomap.mapRegions'
@@ -50,6 +50,9 @@ export default function App() {
   const [mapRegions, setMapRegions] = useState<string[]>(loadMapRegions)
   const mapRegionsRef = useRef(mapRegions)
   mapRegionsRef.current = mapRegions
+  const regionsRef = useRef(regions)
+  regionsRef.current = regions
+  const runningIdsRef = useRef<number[]>([])
   const [tileRevision, setTileRevision] = useState(0)
   const [bounds, setBounds] = useState<[[number, number], [number, number]] | null>(null)
   const [boundsToken, setBoundsToken] = useState(0)
@@ -60,6 +63,9 @@ export default function App() {
   const [job, setJob] = useState<JobView | null>(null)
   const [logs, setLogs] = useState<LogView[]>([])
   const [starting, setStarting] = useState(false)
+  const [activeCount, setActiveCount] = useState(0)
+  const [prebuild, setPrebuild] = useState<PrebuildStatus | null>(null)
+  const [prebuilding, setPrebuilding] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [chatting, setChatting] = useState(false)
   const [modelOpen, setModelOpen] = useState(false)
@@ -100,14 +106,44 @@ export default function App() {
   }, [])
 
   const refreshJob = useCallback(async (code: string) => {
-    const latest = await api<JobView | null>('/api/ingest/jobs/latest')
-    const matched = latest?.status === 'RUNNING'
-      ? latest
-      : (await api<JobView[]>('/api/ingest/jobs?limit=40')).find((item) => item.regionCode === code) ?? null
+    const list = await api<JobView[]>('/api/ingest/jobs?limit=40')
+    const running = list.filter((item) => item.status === 'RUNNING')
+    const matched = running.find((item) => item.regionCode === code)
+      ?? list.find((item) => item.regionCode === code)
+      ?? null
     setJob(matched)
     setLogs(matched ? await api<LogView[]>(`/api/ingest/jobs/${matched.id}/logs?afterId=0`) : [])
-    return latest
-  }, [])
+    const previous = runningIdsRef.current
+    const finished = previous
+      .map((id) => list.find((item) => item.id === id))
+      .filter((item): item is JobView => item != null && item.status !== 'RUNNING')
+    runningIdsRef.current = running.map((item) => item.id)
+    setActiveCount(running.length)
+    const succeeded = finished.filter((item) => item.status === 'SUCCESS' && item.regionCode)
+    if (succeeded.length > 0) {
+      refreshRegions().catch(() => undefined)
+      setTileRevision((value) => value + 1)
+      const unseen = succeeded.filter((item) => !mapRegionsRef.current.includes(item.regionCode))
+      if (unseen.length > 0) {
+        setMapRegions((current) => {
+          const extra = unseen.map((item) => item.regionCode).filter((item) => !current.includes(item))
+          if (extra.length === 0) {
+            return current
+          }
+          const next = [...current, ...extra]
+          rememberMapRegions(next)
+          return next
+        })
+        const region = regionsRef.current.find((item) => item.code === unseen[unseen.length - 1].regionCode)
+        if (region) {
+          setCenter([region.lon, region.lat])
+          setZoom(region.zoom)
+          setFlyToken((value) => value + 1)
+        }
+      }
+    }
+    return running.length
+  }, [refreshRegions])
 
   useEffect(() => {
     saveMapStyle(themeId, styleOverrides)
@@ -147,37 +183,34 @@ export default function App() {
   }, [refreshLayers, mapRegions, tileRevision])
 
   useEffect(() => {
-    if (job?.status !== 'RUNNING') {
+    if (activeCount === 0 && job?.status !== 'RUNNING') {
       return
     }
     const timer = window.setInterval(() => {
-      refreshJob(regionCode)
-        .then((latest) => {
-          if (!latest || latest.status === 'RUNNING') {
-            return
-          }
-          refreshRegions().catch(() => undefined)
-          setTileRevision((value) => value + 1)
-          if (latest.status === 'SUCCESS' && latest.regionCode) {
-            const finished = latest.regionCode
-            const alreadyShown = mapRegionsRef.current.includes(finished)
-            setMapRegions((current) => {
-              if (current.includes(finished)) {
-                return current
-              }
-              const next = [...current, finished]
-              rememberMapRegions(next)
-              return next
-            })
-            if (!alreadyShown) {
-              locateRegion(finished)
-            }
-          }
-        })
-        .catch(() => undefined)
+      refreshJob(regionCode).catch(() => undefined)
     }, 2000)
     return () => window.clearInterval(timer)
-  }, [job?.status, regionCode, refreshJob, refreshRegions])
+  }, [activeCount, job?.status, regionCode, refreshJob])
+
+  const refreshPrebuild = useCallback(async () => {
+    const status = await api<PrebuildStatus>('/api/geo/tiles/prebuild')
+    setPrebuild(status)
+    return status
+  }, [])
+
+  useEffect(() => {
+    refreshPrebuild().catch(() => undefined)
+  }, [refreshPrebuild])
+
+  useEffect(() => {
+    if (prebuild?.state !== 'RUNNING') {
+      return
+    }
+    const timer = window.setInterval(() => {
+      refreshPrebuild().catch(() => undefined)
+    }, 2000)
+    return () => window.clearInterval(timer)
+  }, [prebuild?.state, refreshPrebuild])
 
   function chooseRegion(code: string) {
     setRegionCode(code)
@@ -272,6 +305,10 @@ export default function App() {
         body: JSON.stringify({ regionCode, sourceId })
       })
       setJob(created)
+      setActiveCount((count) => Math.max(count, 1))
+      if (!runningIdsRef.current.includes(created.id)) {
+        runningIdsRef.current = [...runningIdsRef.current, created.id]
+      }
       const sourceName = sources.find((item) => item.id === sourceId)?.name ?? ''
       message.success(`已开始从${sourceName}下载${region?.name ?? ''}数据`)
     } catch (error) {
@@ -387,10 +424,31 @@ export default function App() {
   const mapLabel = mapRegions.length === 0
     ? '未选择省份'
     : mapRegions.map((code) => regions.find((item) => item.code === code)?.name ?? code).join('、')
-  const runningLabel = useMemo(
-    () => job?.status === 'RUNNING' ? `${job.message ?? '正在入库'} · 地图仍显示 ${mapLabel}` : mapLabel,
-    [job, mapLabel]
-  )
+  async function startPrebuild() {
+    setPrebuilding(true)
+    try {
+      const status = await api<PrebuildStatus>('/api/geo/tiles/prebuild', {
+        method: 'POST',
+        body: JSON.stringify({ maxZoom: 6 })
+      })
+      setPrebuild(status)
+      message.success('已开始预生成全国低缩放瓦片')
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '预生成失败')
+    } finally {
+      setPrebuilding(false)
+    }
+  }
+
+  const runningLabel = useMemo(() => {
+    if (job?.status === 'RUNNING') {
+      return `${job.message ?? '正在入库'} · 地图仍显示 ${mapLabel}`
+    }
+    if (activeCount > 0) {
+      return `${activeCount} 个省正在入库 · 地图仍显示 ${mapLabel}`
+    }
+    return mapLabel
+  }, [activeCount, job, mapLabel])
 
   return (
     <Layout className="app">
@@ -429,6 +487,10 @@ export default function App() {
             job={job}
             logs={logs}
             loading={starting}
+            activeCount={activeCount}
+            prebuild={prebuild}
+            prebuilding={prebuilding}
+            onPrebuild={startPrebuild}
             onRegionChange={chooseRegion}
             onMapRegionsChange={changeMapRegions}
             onFit={fitMapRegions}

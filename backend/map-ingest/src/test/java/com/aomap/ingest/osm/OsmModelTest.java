@@ -41,6 +41,60 @@ class OsmModelTest {
     }
 
     @Test
+    void classifiesAreaRelationsAndSkipsRoutes() {
+        OsmTagClassifier.Kind water = OsmTagClassifier.classifyRelation(
+                Map.of("type", "multipolygon", "natural", "water", "name", "巢湖"), true);
+        assertNotNull(water);
+        assertEquals("water", water.layer());
+        assertTrue(water.polygon());
+
+        OsmTagClassifier.Kind boundary = OsmTagClassifier.classifyRelation(
+                Map.of("type", "boundary", "boundary", "administrative", "admin_level", "4"), true);
+        assertNotNull(boundary);
+        assertEquals("boundary", boundary.layer());
+        assertTrue(boundary.polygon());
+
+        assertNull(OsmTagClassifier.classifyRelation(Map.of("type", "route", "route", "bus"), true));
+        assertNull(OsmTagClassifier.classifyRelation(Map.of("type", "multipolygon", "highway", "primary"), true));
+    }
+
+    @Test
+    void chainsRelationRingsIntoPolygons() {
+        String single = RelationGeometry.areaWkt(List.of(
+                List.of(point(0, 0), point(1, 0), point(1, 1)),
+                List.of(point(1, 1), point(0, 1), point(0, 0))
+        ), List.of(
+                List.of(point(0.2, 0.2), point(0.8, 0.2), point(0.8, 0.8), point(0.2, 0.8), point(0.2, 0.2))
+        ));
+        assertNotNull(single);
+        assertTrue(single.startsWith("POLYGON(("));
+        assertTrue(single.contains("),(0.2000000 0.2000000"));
+
+        String multi = RelationGeometry.areaWkt(List.of(
+                List.of(point(0, 0), point(2, 0), point(2, 2), point(0, 2), point(0, 0)),
+                List.of(point(3, 0), point(5, 0), point(5, 2), point(3, 2), point(3, 0))
+        ), List.of());
+        assertNotNull(multi);
+        assertTrue(multi.startsWith("MULTIPOLYGON((("));
+        assertTrue(multi.contains("3.0000000 0.0000000"));
+        assertTrue(multi.endsWith("))"));
+
+        String reversed = RelationGeometry.areaWkt(List.of(
+                List.of(point(0, 0), point(1, 0)),
+                List.of(point(1, 1), point(1, 0)),
+                List.of(point(0, 1), point(1, 1)),
+                List.of(point(0, 0), point(0, 1))
+        ), List.of());
+        assertNotNull(reversed);
+        assertTrue(reversed.startsWith("POLYGON(("));
+        assertTrue(reversed.endsWith("))"));
+
+        assertNull(RelationGeometry.areaWkt(List.of(
+                List.of(point(0, 0), point(1, 0), point(1, 1))
+        ), List.of()));
+    }
+
+    @Test
     void buildsLineAndClosedPolygon() {
         String line = WktBuilder.lineString(List.of(new double[]{117.1, 31.2}, new double[]{117.2, 31.3}));
         assertEquals("LINESTRING(117.1000000 31.2000000,117.2000000 31.3000000)", line);
@@ -61,5 +115,9 @@ class OsmModelTest {
         long packed = OsmImporter.pack(117.227239, 31.820567);
         assertEquals(117.227239, OsmImporter.unpackLon(packed), 1e-6);
         assertEquals(31.820567, OsmImporter.unpackLat(packed), 1e-6);
+    }
+
+    private static double[] point(double lon, double lat) {
+        return new double[]{lon, lat};
     }
 }

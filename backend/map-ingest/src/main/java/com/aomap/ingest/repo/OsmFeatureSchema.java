@@ -205,7 +205,7 @@ public class OsmFeatureSchema implements ApplicationRunner {
                     region_code VARCHAR(32) NOT NULL,
                     job_id BIGINT,
                     CONSTRAINT osm_feature_next_pkey PRIMARY KEY (id, region_code),
-                    CONSTRAINT ck_osm_feature_next_type CHECK (osm_type IN ('node', 'way')),
+                    CONSTRAINT ck_osm_feature_next_type CHECK (osm_type IN ('node', 'way', 'relation')),
                     CONSTRAINT ck_osm_feature_next_layer CHECK (layer IN (
                         'highway', 'railway', 'waterway', 'water',
                         'building', 'landuse', 'boundary', 'poi', 'place'
