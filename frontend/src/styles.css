@@ -19,6 +19,20 @@ body { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; background: #f3f5
 .map-content { position: relative; }
 .map-root { position: absolute; inset: 0; }
 .map-canvas { position: absolute; inset: 0; }
+.map-notice {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  z-index: 2;
+  transform: translateX(-50%);
+  max-width: 70%;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: rgba(16, 32, 51, 0.88);
+  color: #fff;
+  font-size: 13px;
+  pointer-events: none;
+}
 .map-attrib {
   position: absolute;
   right: 6px;

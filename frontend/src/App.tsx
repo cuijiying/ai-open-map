@@ -193,6 +193,26 @@ export default function App() {
     setFlyToken((value) => value + 1)
   }
 
+  function includeRegion(code: string) {
+    const region = regions.find((item) => item.code === code)
+    if (!region) {
+      return
+    }
+    let added = false
+    setMapRegions((current) => {
+      if (current.includes(code)) {
+        return current
+      }
+      added = true
+      const next = [...current, code]
+      rememberMapRegions(next)
+      return next
+    })
+    if (added && region.featureCount <= 0) {
+      message.info(`${region.name}尚未入库，地图上还没有该省的矢量数据`)
+    }
+  }
+
   function changeMapRegions(next: string[]) {
     const added = next.filter((code) => !mapRegions.includes(code))
     setMapRegions(next)
@@ -294,6 +314,9 @@ export default function App() {
     })
     for (const action of actions) {
       if (action.type === 'fly_to' && action.center && action.center.length >= 2) {
+        if (action.regionCode) {
+          includeRegion(action.regionCode)
+        }
         setCenter([action.center[0], action.center[1]])
         setZoom(action.zoom ?? 11)
         setFlyToken((value) => value + 1)
@@ -349,6 +372,17 @@ export default function App() {
       setChatting(false)
     }
   }
+
+  const mapNotice = useMemo(() => {
+    if (regions.length === 0 || mapRegions.length === 0) {
+      return undefined
+    }
+    const selected = regions.filter((item) => mapRegions.includes(item.code))
+    if (selected.length === 0 || selected.some((item) => item.featureCount > 0)) {
+      return undefined
+    }
+    return '当前勾选的省份都还没有入库，地图上暂时没有矢量数据。下载完成后会出现。'
+  }, [mapRegions, regions])
 
   const mapLabel = mapRegions.length === 0
     ? '未选择省份'
@@ -411,6 +445,7 @@ export default function App() {
             markers={markers}
             regions={mapRegions}
             regionNames={Object.fromEntries(regions.map((item) => [item.code, item.name]))}
+            notice={mapNotice}
             tileRevision={tileRevision}
             flyToken={flyToken}
             bounds={bounds}

@@ -11,7 +11,7 @@ public final class GeoDtos {
     public record StatItem(String subtype, long count) {
     }
 
-    public record SearchHit(long osmId, String layer, String subtype, String name, double lon, double lat, String region) {
+    public record SearchHit(long osmId, String layer, String subtype, String name, double lon, double lat, String region, String regionCode) {
     }
 
     public record AnalysisResult(String layer, long count, double lengthMeters, double areaSquareMeters) {

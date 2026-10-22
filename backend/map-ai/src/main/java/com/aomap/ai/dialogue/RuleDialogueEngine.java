@@ -30,48 +30,48 @@ public class RuleDialogueEngine {
     private static List<Place> places() {
         List<Place> places = new ArrayList<>();
         for (Regions.Region region : Regions.ALL) {
-            places.add(new Place(region.name(), region.lon(), region.lat(), region.zoom()));
+            places.add(new Place(region.name(), region.code(), region.lon(), region.lat(), region.zoom()));
             if (!region.shortName().equals(region.name())) {
-                places.add(new Place(region.shortName(), region.lon(), region.lat(), region.zoom()));
+                places.add(new Place(region.shortName(), region.code(), region.lon(), region.lat(), region.zoom()));
             }
             if (!region.capital().equals(region.shortName()) && !region.capital().equals(region.name())) {
-                places.add(new Place(region.capital(), region.capitalLon(), region.capitalLat(), 11));
+                places.add(new Place(region.capital(), region.code(), region.capitalLon(), region.capitalLat(), 11));
             }
         }
         places.addAll(List.of(
-            new Place("黄山市", 118.338, 29.715, 10),
-            new Place("合肥市", 117.227, 31.821, 11),
-            new Place("马鞍山", 118.508, 31.670, 11),
-            new Place("淮南市", 117.000, 32.626, 11),
-            new Place("淮北市", 116.798, 33.956, 11),
-            new Place("铜陵市", 117.812, 30.945, 11),
-            new Place("安庆市", 117.064, 30.544, 11),
-            new Place("滁州市", 118.316, 32.304, 11),
-            new Place("阜阳市", 115.814, 32.890, 11),
-            new Place("宿州市", 116.964, 33.646, 11),
-            new Place("六安市", 116.522, 31.736, 11),
-            new Place("亳州市", 115.779, 33.845, 11),
-            new Place("池州市", 117.491, 30.665, 11),
-            new Place("宣城市", 118.759, 30.941, 11),
-            new Place("蚌埠市", 117.389, 32.917, 11),
-            new Place("芜湖市", 118.376, 31.326, 11),
-            new Place("黄山", 118.167, 30.133, 11),
-            new Place("合肥", 117.227, 31.821, 11),
-            new Place("芜湖", 118.376, 31.326, 11),
-            new Place("蚌埠", 117.389, 32.917, 11),
-            new Place("淮南", 117.000, 32.626, 11),
-            new Place("淮北", 116.798, 33.956, 11),
-            new Place("铜陵", 117.812, 30.945, 11),
-            new Place("安庆", 117.064, 30.544, 11),
-            new Place("滁州", 118.316, 32.304, 11),
-            new Place("阜阳", 115.814, 32.890, 11),
-            new Place("宿州", 116.964, 33.646, 11),
-            new Place("六安", 116.522, 31.736, 11),
-            new Place("亳州", 115.779, 33.845, 11),
-            new Place("池州", 117.491, 30.665, 11),
-            new Place("宣城", 118.759, 30.941, 11),
-            new Place("巢湖", 117.874, 31.598, 11),
-            new Place("九华山", 117.803, 30.478, 12)
+            anhui("黄山市", 118.338, 29.715, 10),
+            anhui("合肥市", 117.227, 31.821, 11),
+            anhui("马鞍山", 118.508, 31.670, 11),
+            anhui("淮南市", 117.000, 32.626, 11),
+            anhui("淮北市", 116.798, 33.956, 11),
+            anhui("铜陵市", 117.812, 30.945, 11),
+            anhui("安庆市", 117.064, 30.544, 11),
+            anhui("滁州市", 118.316, 32.304, 11),
+            anhui("阜阳市", 115.814, 32.890, 11),
+            anhui("宿州市", 116.964, 33.646, 11),
+            anhui("六安市", 116.522, 31.736, 11),
+            anhui("亳州市", 115.779, 33.845, 11),
+            anhui("池州市", 117.491, 30.665, 11),
+            anhui("宣城市", 118.759, 30.941, 11),
+            anhui("蚌埠市", 117.389, 32.917, 11),
+            anhui("芜湖市", 118.376, 31.326, 11),
+            anhui("黄山", 118.167, 30.133, 11),
+            anhui("合肥", 117.227, 31.821, 11),
+            anhui("芜湖", 118.376, 31.326, 11),
+            anhui("蚌埠", 117.389, 32.917, 11),
+            anhui("淮南", 117.000, 32.626, 11),
+            anhui("淮北", 116.798, 33.956, 11),
+            anhui("铜陵", 117.812, 30.945, 11),
+            anhui("安庆", 117.064, 30.544, 11),
+            anhui("滁州", 118.316, 32.304, 11),
+            anhui("阜阳", 115.814, 32.890, 11),
+            anhui("宿州", 116.964, 33.646, 11),
+            anhui("六安", 116.522, 31.736, 11),
+            anhui("亳州", 115.779, 33.845, 11),
+            anhui("池州", 117.491, 30.665, 11),
+            anhui("宣城", 118.759, 30.941, 11),
+            anhui("巢湖", 117.874, 31.598, 11),
+            anhui("九华山", 117.803, 30.478, 12)
         ));
         return List.copyOf(places);
     }
@@ -109,7 +109,7 @@ public class RuleDialogueEngine {
             Regions.Region current = Regions.orDefault(regionCode);
             return Optional.of(new DialoguePlan("已恢复默认图层，并回到" + current.name() + "。", List.of(
                     action("only_layers", DEFAULT_LAYERS, null),
-                    new MapAction("fly_to", null, null, List.of(current.lon(), current.lat()), current.zoom(), current.name(), null),
+                    new MapAction("fly_to", null, null, List.of(current.lon(), current.lat()), current.zoom(), current.name(), null, current.code()),
                     action("clear_markers", null, null)
             ), List.of()));
         }
@@ -201,7 +201,7 @@ public class RuleDialogueEngine {
             if (!reply.isEmpty()) {
                 reply.append("，");
             }
-            reply.append("已定位到").append(place.name());
+            reply.append("已定位到").append(place.name()).append(regionHint(place));
         }
         reply.append("。");
         return new DialoguePlan(reply.toString(), actions, List.of());
@@ -215,19 +215,19 @@ public class RuleDialogueEngine {
             actions.add(0, action("show_layers", layers.layers(), layers.filters()));
             extra = "，并显示" + labels(layers.layers());
         }
-        return new DialoguePlan("已定位到" + place.name() + extra + "。", actions, List.of());
+        return new DialoguePlan("已定位到" + place.name() + regionHint(place) + extra + "。", actions, List.of());
     }
 
     private Optional<DialoguePlan> stylePlan(String text) {
         String theme = themeId(text);
         if (theme != null && containsAny(text, "风格", "样式", "主题", "底图", "配色", "切换", "换成", "改成", "改为", "调成", "打开", "显示", "使用", "地图")) {
             return Optional.of(new DialoguePlan("已切换为" + themeLabel(theme) + "。", List.of(
-                    new MapAction("set_style", null, null, null, null, theme, null)
+                    new MapAction("set_style", null, null, null, null, theme, null, null)
             ), List.of()));
         }
         if (containsAny(text, "风格", "样式", "主题", "配色") && containsAny(text, "默认", "重置", "恢复")) {
             return Optional.of(new DialoguePlan("已恢复浅色风格。", List.of(
-                    new MapAction("set_style", null, null, null, null, "reset", null)
+                    new MapAction("set_style", null, null, null, null, "reset", null, null)
             ), List.of()));
         }
         if (containsAny(text, "改成", "换成", "改为", "调成", "设为", "变成")) {
@@ -235,7 +235,7 @@ public class RuleDialogueEngine {
             LayerMatch layers = findLayers(text);
             if (color != null && !layers.layers().isEmpty()) {
                 return Optional.of(new DialoguePlan("已把" + labels(layers.layers()) + "调整为指定颜色。", List.of(
-                        new MapAction("paint_layer", layers.layers(), layers.filters().isEmpty() ? null : layers.filters(), null, null, color, null)
+                        new MapAction("paint_layer", layers.layers(), layers.filters().isEmpty() ? null : layers.filters(), null, null, color, null, null)
                 ), List.of()));
             }
         }
@@ -312,11 +312,22 @@ public class RuleDialogueEngine {
     }
 
     private static MapAction action(String type, List<String> layers, Map<String, List<String>> filters) {
-        return new MapAction(type, layers, filters == null || filters.isEmpty() ? null : filters, null, null, null, null);
+        return new MapAction(type, layers, filters == null || filters.isEmpty() ? null : filters, null, null, null, null, null);
     }
 
     private static MapAction fly(Place place) {
-        return new MapAction("fly_to", null, null, List.of(place.lon(), place.lat()), place.zoom(), place.name(), null);
+        return new MapAction("fly_to", null, null, List.of(place.lon(), place.lat()), place.zoom(), place.name(), null, place.regionCode());
+    }
+
+    private static String regionHint(Place place) {
+        if (place.regionCode() == null || place.regionCode().isBlank()) {
+            return "";
+        }
+        return "，地图包含" + Regions.require(place.regionCode()).name();
+    }
+
+    private static Place anhui(String name, double lon, double lat, double zoom) {
+        return new Place(name, "anhui", lon, lat, zoom);
     }
 
     private static LayerMatch findLayers(String text) {
@@ -397,7 +408,7 @@ public class RuleDialogueEngine {
         return word.tokens().stream().mapToInt(String::length).max().orElse(0);
     }
 
-    private record Place(String name, double lon, double lat, double zoom) {
+    private record Place(String name, String regionCode, double lon, double lat, double zoom) {
     }
 
     private record LayerWord(List<String> layers, List<String> tokens, List<String> filter) {

@@ -95,6 +95,7 @@ export interface MapAction {
   zoom?: number
   label?: string
   points?: MarkerPoint[]
+  regionCode?: string
 }
 
 export interface DataTable {

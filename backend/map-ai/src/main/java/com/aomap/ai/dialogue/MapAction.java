@@ -10,7 +10,8 @@ public record MapAction(
         List<Double> center,
         Double zoom,
         String label,
-        List<Marker> points
+        List<Marker> points,
+        String regionCode
 ) {
     public record Marker(String name, String layer, String subtype, double lon, double lat) {
     }
