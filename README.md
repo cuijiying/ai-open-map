@@ -14,6 +14,9 @@
 | [运行与接口](docs/03-运行与接口.md) | 启动、端口、对话指令和 HTTP 接口 |
 | [Nacos 安装与使用](docs/06-Nacos安装与使用.md) | 注册中心安装、cloud 模式联调 |
 | [多省切片学习笔记](docs/05-多省切片学习笔记.md) | 2026-10-21 的实现：入库时切片为何还能用，多个省如何画在同一张地图上 |
+| [作品定位与规划](docs/competition/01-作品定位与规划.md) | AI 创新大赛：智图灵 GeoMind Agent 定位与 Agent 增强规划 |
+| [作品介绍全文](docs/competition/02-作品介绍全文.md) | 大赛报送用作品介绍文稿（按已实现口径） |
+| [作品介绍 PDF](docs/competition/智图灵-GeoMind-Agent-作品介绍.pdf) | 详细 PDF 作品介绍文档 |
 
 ## 本地启动
 
