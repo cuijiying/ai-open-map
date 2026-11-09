@@ -164,18 +164,33 @@ class DocPDF(FPDF):
         self.multi_cell(0, 5, text, align="C")
         self.ln(2)
 
-    def figure(self, filename: str, caption: str, max_h: float = 95) -> None:
+    def figure(self, filename: str, caption: str, max_h: float = 95, full_page: bool = False) -> None:
         path = IMG / filename
         if not path.exists():
             self.body(f"[缺少插图：{filename}]")
             return
-        if self.get_y() + max_h + 12 > 275:
-            self.add_page()
-        # fit width 180mm
-        with Image.open(path) as im:  # type: ignore[name-defined]
+        with Image.open(path) as im:
             iw, ih = im.size
-        aspect = ih / iw
-        w = 180
+            # Ensure RGB raster; avoids blank embeds for some JPEG variants.
+            if im.mode != "RGB":
+                rgb = im.convert("RGB")
+                tmp = IMG / f"_embed_{path.stem}.png"
+                rgb.save(tmp, "PNG")
+                path = tmp
+                iw, ih = rgb.size
+        aspect = ih / float(iw)
+        if full_page:
+            self.add_page()
+            self.set_font("zh", "B", 12)
+            self.set_text_color(30, 64, 175)
+            self.cell(0, 8, caption)
+            self.ln(10)
+            max_w, max_h = 180, 240
+        else:
+            if self.get_y() + min(max_h, 180 * aspect) + 14 > 275:
+                self.add_page()
+            max_w = 180
+        w = max_w
         h = w * aspect
         if h > max_h:
             h = max_h
@@ -183,7 +198,8 @@ class DocPDF(FPDF):
         x = 15 + (180 - w) / 2
         self.image(str(path), x=x, y=self.get_y(), w=w, h=h)
         self.set_y(self.get_y() + h + 2)
-        self.caption(caption)
+        if not full_page:
+            self.caption(caption)
 
     def _row_height(self, row: list[str], widths: list[float], line_h: float = 5.0) -> float:
         tallest = 1
@@ -287,21 +303,22 @@ def build() -> Path:
     pdf.h2("系统实机截图")
     pdf.body(
         "以下为系统真实运行界面：左侧为风格/图层或入库任务，中央为 MapLibre 地图，右侧为地图 Agent 对话面板。"
+        "三张截图各占一页，便于查看细节。"
     )
     pdf.figure(
-        "screenshot-dark-roads.jpg",
+        "shot-1-dark-roads.png",
         "图 1  深色风格全省路网：图层勾选 + 地图对话快捷指令",
-        max_h=78,
+        full_page=True,
     )
     pdf.figure(
-        "screenshot-city-detail.jpg",
+        "shot-2-city-detail.png",
         "图 2  城市级路网细节：要素点击弹窗 + OSM 入库日志",
-        max_h=78,
+        full_page=True,
     )
     pdf.figure(
-        "screenshot-imagery-chat.jpg",
+        "shot-3-imagery-chat.png",
         "图 3  影像风格与对话操控：定位合肥、显示道路水系、切换日落风格",
-        max_h=78,
+        full_page=True,
     )
 
     # 三、应用场景
