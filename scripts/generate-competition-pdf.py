@@ -283,7 +283,26 @@ def build() -> Path:
     pdf.quote(
         "一句话价值：把「会说话的开源地图」变成「会办事的地图 Agent」——可见、可控、可私有化、可开源复用。"
     )
-    pdf.figure("ui-overview.png", "图 1  系统界面示意：左侧任务/图层，中央地图，右侧 Agent 对话", max_h=88)
+
+    pdf.h2("系统实机截图")
+    pdf.body(
+        "以下为系统真实运行界面：左侧为风格/图层或入库任务，中央为 MapLibre 地图，右侧为地图 Agent 对话面板。"
+    )
+    pdf.figure(
+        "screenshot-dark-roads.jpg",
+        "图 1  深色风格全省路网：图层勾选 + 地图对话快捷指令",
+        max_h=78,
+    )
+    pdf.figure(
+        "screenshot-city-detail.jpg",
+        "图 2  城市级路网细节：要素点击弹窗 + OSM 入库日志",
+        max_h=78,
+    )
+    pdf.figure(
+        "screenshot-imagery-chat.jpg",
+        "图 3  影像风格与对话操控：定位合肥、显示道路水系、切换日落风格",
+        max_h=78,
+    )
 
     # 三、应用场景
     pdf.h1("三、应用场景")
@@ -352,7 +371,7 @@ def build() -> Path:
         "                ▼\n"
         "        PostgreSQL 16 + PostGIS（ai_open_map）"
     )
-    pdf.figure("architecture-overview.png", "图 2  总体系统架构：网关分流与微服务职责", max_h=100)
+    pdf.figure("architecture-overview.png", "图 4  总体系统架构：网关分流与微服务职责", max_h=100)
 
     pdf.h2("5.2 Agent 逻辑架构")
     pdf.body("用户自然语言进入 Orchestrator Agent：")
@@ -361,7 +380,7 @@ def build() -> Path:
     pdf.numbered(3, "执行：经 Tool Registry 调用 MapOps / GeoAnalyst / IngestOps / ReportOps。")
     pdf.numbered(4, "反思：工具失败或结果为空时调整计划重试；成功则汇总回复与地图动作。")
     pdf.numbered(5, "记忆：将会话、中间结论与地图状态写入会话存储，支持指代（「再分析一下」「换浙江」）。")
-    pdf.figure("agent-architecture.png", "图 3  Agent 逻辑架构：编排智能体与四大工具域", max_h=100)
+    pdf.figure("agent-architecture.png", "图 5  Agent 逻辑架构：编排智能体与四大工具域", max_h=100)
 
     pdf.h2("5.3 技术栈")
     pdf.table(
@@ -386,7 +405,7 @@ def build() -> Path:
     pdf.bullet("解析 node/way/relation（面关系），分类写入九大图层；")
     pdf.bullet("分区发布：单省发布不阻塞其他省切片；")
     pdf.bullet("可选全国低缩放瓦片预生成，提升首屏与宏观浏览体验。")
-    pdf.figure("data-pipeline.png", "图 4  开源地图数据管道：从 PBF 到 Agent 可用", max_h=78)
+    pdf.figure("data-pipeline.png", "图 6  开源地图数据管道：从 PBF 到 Agent 可用", max_h=78)
 
     pdf.h2("6.2 矢量地图与多省同图")
     pdf.bullet("九图层：道路、铁路、水系线、水体、建筑、土地利用、行政区划、兴趣点、地名；")
