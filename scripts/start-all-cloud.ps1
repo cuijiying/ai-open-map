@@ -15,14 +15,22 @@ if (-not (Test-Path $java)) {
     $java = $found.Source
 }
 
-function Test-Listening([int] $port) {
-    return [bool](Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue)
+function Get-ListenerCommand([int] $port) {
+    $conn = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $conn) { return $null }
+    $proc = Get-CimInstance Win32_Process -Filter "ProcessId=$($conn.OwningProcess)"
+    if (-not $proc -or -not $proc.CommandLine) { return "pid $($conn.OwningProcess)" }
+    return [string]$proc.CommandLine
 }
 
 function Start-ServiceJar([string] $name, [int] $port) {
-    if (Test-Listening $port) {
-        Write-Host "$name already listening on ${port}, skip"
-        return
+    $listener = Get-ListenerCommand $port
+    if ($listener) {
+        if ($listener -like "*$name-0.1.0.jar*") {
+            Write-Host "$name already listening on ${port}, skip"
+            return
+        }
+        throw "Port ${port} is used by another program, cannot start ${name}. Process: $listener"
     }
     $jar = Join-Path $root "backend\$name\target\$name-0.1.0.jar"
     if (-not (Test-Path $jar)) {

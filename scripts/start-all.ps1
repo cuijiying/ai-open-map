@@ -11,14 +11,22 @@ if (-not (Test-Path $java)) {
     $java = $found.Source
 }
 
-function Test-Listening([int] $port) {
-    return [bool](Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue)
+function Get-ListenerCommand([int] $port) {
+    $conn = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $conn) { return $null }
+    $proc = Get-CimInstance Win32_Process -Filter "ProcessId=$($conn.OwningProcess)"
+    if (-not $proc -or -not $proc.CommandLine) { return "pid $($conn.OwningProcess)" }
+    return [string]$proc.CommandLine
 }
 
 function Start-ServiceJar([string] $name, [int] $port) {
-    if (Test-Listening $port) {
-        Write-Host "$name 已在 $port 监听，跳过"
-        return
+    $listener = Get-ListenerCommand $port
+    if ($listener) {
+        if ($listener -like "*$name-0.1.0.jar*") {
+            Write-Host "$name 已在 $port 监听，跳过"
+            return
+        }
+        throw "${port} 已被其他程序占用，无法启动 $name。当前进程：$listener"
     }
     $jar = Join-Path $root "backend\$name\target\$name-0.1.0.jar"
     if (-not (Test-Path $jar)) {
@@ -40,8 +48,13 @@ Start-ServiceJar "map-geo" 8082
 Start-ServiceJar "map-ai" 8083
 Start-ServiceJar "map-gateway" 8080
 
-if (Test-Listening 5173) {
-    Write-Host "前端已在 5173 监听，跳过"
+$frontendListener = Get-ListenerCommand 5173
+if ($frontendListener) {
+    if ($frontendListener -like "*ai-open-map\frontend*") {
+        Write-Host "前端已在 5173 监听，跳过"
+    } else {
+        throw "5173 已被其他程序占用，无法启动前端。当前进程：$frontendListener"
+    }
 } else {
     $npm = (Get-Command npm.cmd -ErrorAction SilentlyContinue).Source
     if (-not $npm) { throw "未找到 npm.cmd，后端已启动，前端请到 frontend 目录手动 npm run dev" }
