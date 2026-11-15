@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/ai")
+@RequestMapping("/api/v1/ai")
 public class AiController {
 
     private final ModelConfigService models;

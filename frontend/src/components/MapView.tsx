@@ -219,7 +219,7 @@ export default function MapView({
 function tileUrl(regions: string[], layer: string, revision: number) {
   const codes = [...new Set(regions.filter(Boolean))].sort()
   const value = codes.length === 0 ? 'none' : codes.join(',')
-  return `${window.location.origin}/api/tiles/${layer}/{z}/{x}/{y}.pbf?regions=${encodeURIComponent(value)}&v=${revision}`
+  return `${window.location.origin}/api/v1/tiles/${layer}/{z}/{x}/{y}.pbf?regions=${encodeURIComponent(value)}&v=${revision}`
 }
 
 function emptyCollection() {

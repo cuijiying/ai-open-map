@@ -88,31 +88,31 @@ export default function App() {
       return
     }
     const regionsParam = [...codes].sort().join(',')
-    setCounts(await api<LayerCount[]>(`/api/geo/layers?regions=${encodeURIComponent(regionsParam)}`))
+    setCounts(await api<LayerCount[]>(`/api/v1/geo/layers?regions=${encodeURIComponent(regionsParam)}`))
   }, [])
 
   const refreshRegions = useCallback(async () => {
-    const list = await api<RegionOption[]>('/api/ingest/regions')
+    const list = await api<RegionOption[]>('/api/v1/ingest/regions')
     setRegions(list)
     return list
   }, [])
 
   const refreshSources = useCallback(async (code: string) => {
     setProbe(null)
-    const list = await api<SourceOption[]>(`/api/ingest/sources?region=${encodeURIComponent(code)}`)
+    const list = await api<SourceOption[]>(`/api/v1/ingest/sources?region=${encodeURIComponent(code)}`)
     setSources(list)
     setSourceId((current) => list.some((item) => item.id === current) ? current : (list[0]?.id ?? current))
     return list
   }, [])
 
   const refreshJob = useCallback(async (code: string) => {
-    const list = await api<JobView[]>('/api/ingest/jobs?limit=40')
+    const list = await api<JobView[]>('/api/v1/ingest/jobs?limit=40')
     const running = list.filter((item) => item.status === 'RUNNING')
     const matched = running.find((item) => item.regionCode === code)
       ?? list.find((item) => item.regionCode === code)
       ?? null
     setJob(matched)
-    setLogs(matched ? await api<LogView[]>(`/api/ingest/jobs/${matched.id}/logs?afterId=0`) : [])
+    setLogs(matched ? await api<LogView[]>(`/api/v1/ingest/jobs/${matched.id}/logs?afterId=0`) : [])
     const previous = runningIdsRef.current
     const finished = previous
       .map((id) => list.find((item) => item.id === id))
@@ -193,7 +193,7 @@ export default function App() {
   }, [activeCount, job?.status, regionCode, refreshJob])
 
   const refreshPrebuild = useCallback(async () => {
-    const status = await api<PrebuildStatus>('/api/geo/tiles/prebuild')
+    const status = await api<PrebuildStatus>('/api/v1/geo/tiles/prebuild')
     setPrebuild(status)
     return status
   }, [])
@@ -284,7 +284,7 @@ export default function App() {
   async function testSource() {
     setProbing(true)
     try {
-      const result = await api<SourceProbe>('/api/ingest/sources/test', {
+      const result = await api<SourceProbe>('/api/v1/ingest/sources/test', {
         method: 'POST',
         body: JSON.stringify({ regionCode, sourceId })
       })
@@ -300,7 +300,7 @@ export default function App() {
     const region = regions.find((item) => item.code === regionCode)
     setStarting(true)
     try {
-      const created = await api<JobView>('/api/ingest/jobs', {
+      const created = await api<JobView>('/api/v1/ingest/jobs', {
         method: 'POST',
         body: JSON.stringify({ regionCode, sourceId })
       })
@@ -387,7 +387,7 @@ export default function App() {
     setMessages(history)
     setChatting(true)
     try {
-      const result = await api<ChatResponse>('/api/ai/chat', {
+      const result = await api<ChatResponse>('/api/v1/ai/chat', {
         method: 'POST',
         body: JSON.stringify({
           messages: history.map((item) => ({ role: item.role, content: item.content })),
@@ -427,7 +427,7 @@ export default function App() {
   async function startPrebuild() {
     setPrebuilding(true)
     try {
-      const status = await api<PrebuildStatus>('/api/geo/tiles/prebuild', {
+      const status = await api<PrebuildStatus>('/api/v1/geo/tiles/prebuild', {
         method: 'POST',
         body: JSON.stringify({ maxZoom: 6 })
       })

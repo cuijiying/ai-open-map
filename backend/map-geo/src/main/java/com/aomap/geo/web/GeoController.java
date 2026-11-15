@@ -37,7 +37,7 @@ public class GeoController {
         this.warmup = warmup;
     }
 
-    @GetMapping(value = "/api/tiles/{layer}/{z}/{x}/{y}.pbf")
+    @GetMapping(value = "/api/v1/tiles/{layer}/{z}/{x}/{y}.pbf")
     public ResponseEntity<byte[]> tile(@PathVariable String layer, @PathVariable int z,
                                        @PathVariable int x, @PathVariable int y,
                                        @RequestParam(required = false) String regions,
@@ -59,7 +59,7 @@ public class GeoController {
         return Duration.ofMinutes(2);
     }
 
-    @PostMapping("/api/geo/tiles/prebuild")
+    @PostMapping("/api/v1/geo/tiles/prebuild")
     public ApiResult<PrebuildStatus> startPrebuild(@RequestBody(required = false) PrebuildRequest request) {
         int maxZoom = request == null || request.maxZoom() == null
                 ? TileWarmupService.defaultMaxZoom()
@@ -67,25 +67,25 @@ public class GeoController {
         return ApiResult.ok(warmup.start(maxZoom));
     }
 
-    @GetMapping("/api/geo/tiles/prebuild")
+    @GetMapping("/api/v1/geo/tiles/prebuild")
     public ApiResult<PrebuildStatus> prebuildStatus() {
         return ApiResult.ok(warmup.status());
     }
 
-    @GetMapping("/api/geo/layers")
+    @GetMapping("/api/v1/geo/layers")
     public ApiResult<List<LayerCount>> layers(@RequestParam(required = false) String regions,
                                               @RequestParam(required = false) String region) {
         return ApiResult.ok(queries.layers(regionArgument(regions, region)));
     }
 
-    @GetMapping("/api/geo/stats")
+    @GetMapping("/api/v1/geo/stats")
     public ApiResult<List<StatItem>> stats(@RequestParam(required = false) String regions,
                                            @RequestParam(required = false) String region,
                                            @RequestParam String layer) {
         return ApiResult.ok(queries.stats(regionArgument(regions, region), layer));
     }
 
-    @GetMapping("/api/geo/search")
+    @GetMapping("/api/v1/geo/search")
     public ApiResult<List<SearchHit>> search(@RequestParam(required = false) String regions,
                                              @RequestParam(required = false) String region,
                                              @RequestParam String keyword,
@@ -94,7 +94,7 @@ public class GeoController {
         return ApiResult.ok(queries.search(regionArgument(regions, region), keyword, layer, limit));
     }
 
-    @GetMapping("/api/geo/analyze")
+    @GetMapping("/api/v1/geo/analyze")
     public ApiResult<AnalysisResult> analyze(@RequestParam(required = false) String regions,
                                              @RequestParam(required = false) String region,
                                              @RequestParam String layer,

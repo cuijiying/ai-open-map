@@ -13,12 +13,12 @@ spring:
         - id: ingest
           uri: lb://map-ingest
           predicates:
-            - Path=/api/ingest/**
+            - Path=/api/v1/ingest/**
         - id: geo
           uri: lb://map-geo
           predicates:
-            - Path=/api/geo/**,/api/tiles/**
+            - Path=/api/v1/geo/**,/api/v1/tiles/**
         - id: ai
           uri: lb://map-ai
           predicates:
-            - Path=/api/ai/**
+            - Path=/api/v1/ai/**

@@ -23,19 +23,19 @@ public class GeoApi {
     }
 
     public List<LayerCount> layers(List<String> regions) {
-        String uri = UriComponentsBuilder.fromPath("/api/geo/layers").queryParam("regions", join(regions)).build().toUriString();
+        String uri = UriComponentsBuilder.fromPath("/api/v1/geo/layers").queryParam("regions", join(regions)).build().toUriString();
         return body(client.get().uri(uri), new ParameterizedTypeReference<ApiResult<List<LayerCount>>>() {
         });
     }
 
     public List<StatItem> stats(List<String> regions, String layer) {
-        String uri = UriComponentsBuilder.fromPath("/api/geo/stats").queryParam("regions", join(regions)).queryParam("layer", layer).build().toUriString();
+        String uri = UriComponentsBuilder.fromPath("/api/v1/geo/stats").queryParam("regions", join(regions)).queryParam("layer", layer).build().toUriString();
         return body(client.get().uri(uri), new ParameterizedTypeReference<ApiResult<List<StatItem>>>() {
         });
     }
 
     public List<SearchHit> search(List<String> regions, String keyword, String layer) {
-        UriComponentsBuilder builder = UriComponentsBuilder.fromPath("/api/geo/search")
+        UriComponentsBuilder builder = UriComponentsBuilder.fromPath("/api/v1/geo/search")
                 .queryParam("regions", join(regions))
                 .queryParam("keyword", keyword)
                 .queryParam("limit", 8);
@@ -47,7 +47,7 @@ public class GeoApi {
     }
 
     public AnalysisResult analyze(List<String> regions, String layer, double minLon, double minLat, double maxLon, double maxLat) {
-        String uri = UriComponentsBuilder.fromPath("/api/geo/analyze")
+        String uri = UriComponentsBuilder.fromPath("/api/v1/geo/analyze")
                 .queryParam("regions", join(regions))
                 .queryParam("layer", layer)
                 .queryParam("minLon", minLon)

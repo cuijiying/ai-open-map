@@ -22,7 +22,7 @@ export default function ModelModal({ open, onClose }: Props) {
   const [form] = Form.useForm<FormValue>()
 
   async function reload() {
-    setModels(await api<ModelView[]>('/api/ai/models'))
+    setModels(await api<ModelView[]>('/api/v1/ai/models'))
   }
 
   useEffect(() => {
@@ -40,9 +40,9 @@ export default function ModelModal({ open, onClose }: Props) {
   async function save() {
     const value = await form.validateFields()
     if (value.id) {
-      await api(`/api/ai/models/${value.id}`, { method: 'PUT', body: JSON.stringify(value) })
+      await api(`/api/v1/ai/models/${value.id}`, { method: 'PUT', body: JSON.stringify(value) })
     } else {
-      await api('/api/ai/models', { method: 'POST', body: JSON.stringify(value) })
+      await api('/api/v1/ai/models', { method: 'POST', body: JSON.stringify(value) })
     }
     message.success('已保存')
     form.setFieldValue('id', undefined)
@@ -52,7 +52,7 @@ export default function ModelModal({ open, onClose }: Props) {
 
   async function test() {
     const value = await form.validateFields()
-    const result = await api<{ reply: string }>('/api/ai/models/test', { method: 'POST', body: JSON.stringify(value) })
+    const result = await api<{ reply: string }>('/api/v1/ai/models/test', { method: 'POST', body: JSON.stringify(value) })
     message.success(`连接成功：${result.reply}`)
   }
 
@@ -84,7 +84,7 @@ export default function ModelModal({ open, onClose }: Props) {
             title: '启用',
             dataIndex: 'enabled',
             render: (enabled: boolean, record: ModelView) => (
-              <Switch checked={enabled} onChange={async () => { await api(`/api/ai/models/${record.id}/enable`, { method: 'POST' }); await reload() }} />
+              <Switch checked={enabled} onChange={async () => { await api(`/api/v1/ai/models/${record.id}/enable`, { method: 'POST' }); await reload() }} />
             )
           },
           {
