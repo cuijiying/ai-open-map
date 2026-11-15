@@ -29,7 +29,7 @@ mvn -DskipTests package
 .\scripts\start-all.ps1
 ```
 
-浏览器打开 http://127.0.0.1:5173 。接口统一走网关 http://127.0.0.1:8080 。停止服务：
+浏览器打开 http://127.0.0.1:5173 。接口统一走网关 http://127.0.0.1:8080 。已安装 Docker 时也可以在仓库根目录执行 `docker compose up --build`，页面在 http://127.0.0.1:8088 ，数据库映射到本机 5433，避免占用已经在用的 5432。停止服务：
 
 ```powershell
 .\scripts\stop-all.ps1

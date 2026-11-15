@@ -1,0 +1,10 @@
+.git
+.idea
+.vscode
+logs
+data
+tools
+frontend/node_modules
+frontend/dist
+**/*.rar
+**/target

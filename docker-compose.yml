@@ -1,0 +1,126 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: post
+      POSTGRES_DB: ai_open_map
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ai_open_map"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  map-ingest:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+      args:
+        MODULE: map-ingest
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/ai_open_map
+      DB_USER: postgres
+      DB_PASSWORD: post
+      OSM_DATA_DIR: /data/osm
+    volumes:
+      - osm:/data/osm
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+
+  map-geo:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+      args:
+        MODULE: map-geo
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/ai_open_map
+      DB_USER: postgres
+      DB_PASSWORD: post
+      TILE_DIR: /data/tiles
+    volumes:
+      - tiles:/data/tiles
+    ports:
+      - "8082:8082"
+    depends_on:
+      map-ingest:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8082/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+
+  map-ai:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+      args:
+        MODULE: map-ai
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/ai_open_map
+      DB_USER: postgres
+      DB_PASSWORD: post
+      GEO_BASE_URL: http://map-geo:8082
+    ports:
+      - "8083:8083"
+    depends_on:
+      map-geo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8083/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+
+  map-gateway:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+      args:
+        MODULE: map-gateway
+    ports:
+      - "8080:8080"
+    depends_on:
+      map-ingest:
+        condition: service_healthy
+      map-geo:
+        condition: service_healthy
+      map-ai:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  web:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.web
+    ports:
+      - "8088:80"
+    depends_on:
+      map-gateway:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  osm:
+  tiles:
