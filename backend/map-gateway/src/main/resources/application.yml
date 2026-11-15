@@ -26,6 +26,10 @@ spring:
             allowedMethods: "*"
             allowedHeaders: "*"
       routes:
+        - id: auth
+          uri: http://127.0.0.1:8084
+          predicates:
+            - Path=/api/v1/auth/**
         - id: ingest
           uri: http://127.0.0.1:8081
           predicates:
@@ -38,6 +42,9 @@ spring:
           uri: http://127.0.0.1:8083
           predicates:
             - Path=/api/v1/ai/**
+
+auth:
+  jwt-secret: ${AUTH_JWT_SECRET:aomap-local-dev-secret-change-me}
 
 management:
   endpoints:

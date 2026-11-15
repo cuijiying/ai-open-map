@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import maplibregl, { GeoJSONSource, Map, VectorTileSource } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import { authHeader } from '../api'
 import { LAYERS } from '../layers'
 import { applyLayerState, interactiveLayerIds, overlayLayers, rememberBasemap, syncOverlayStyle } from '../mapPaint'
 import { attributionOf, featureCaption, maxzoomOf, ResolvedStyle, tilesOf } from '../mapStyle'
@@ -52,8 +53,14 @@ export default function MapView({
     const basemap = initial.basemap === 'none' ? 'light' : initial.basemap
     const map = new maplibregl.Map({
       container: container.current,
-      center: [117.28, 31.86],
-      zoom: 6.4,
+      center,
+      zoom,
+      transformRequest: (url, resourceType) => {
+        if (resourceType === 'Tile' && url.includes('/api/v1/')) {
+          return { url, headers: authHeader() }
+        }
+        return { url }
+      },
       attributionControl: false,
       localIdeographFontFamily: "'Microsoft YaHei', 'PingFang SC', sans-serif",
       style: {

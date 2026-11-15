@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aomap.auth.mapper.AuthMapper">
+
+    <select id="findByEmail" resultType="com.aomap.auth.domain.UserRow">
+        SELECT id, email, name, password_hash
+        FROM auth_user
+        WHERE email = #{email}
+    </select>
+
+    <insert id="insertUser" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO auth_user (email, name, password_hash)
+        VALUES (#{email}, #{name}, #{passwordHash})
+    </insert>
+
+    <insert id="insertOrg" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO auth_org (name)
+        VALUES (#{name})
+    </insert>
+
+    <insert id="insertMember">
+        INSERT INTO auth_member (org_id, user_id, role)
+        VALUES (#{orgId}, #{userId}, #{role})
+    </insert>
+
+    <select id="findMembership" resultType="com.aomap.auth.domain.MembershipRow">
+        SELECT org_id, role
+        FROM auth_member
+        WHERE user_id = #{userId}
+        ORDER BY org_id
+        LIMIT 1
+    </select>
+</mapper>

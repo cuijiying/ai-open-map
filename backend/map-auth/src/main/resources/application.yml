@@ -1,0 +1,47 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: map-auth
+  config:
+    import: classpath:datasource-druid.yml
+  datasource:
+    druid:
+      name: map-auth
+      max-active: 8
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    table: flyway_auth_history
+    baseline-on-migrate: true
+    baseline-version: 0
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        fail-fast: false
+    discovery:
+      enabled: false
+    service-registry:
+      auto-registration:
+        enabled: false
+  jackson:
+    default-property-inclusion: non_null
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+auth:
+  jwt-secret: ${AUTH_JWT_SECRET:aomap-local-dev-secret-change-me}
+
+logging:
+  charset:
+    console: UTF-8
+    file: UTF-8
+  file:
+    name: ${user.dir}/logs/map-auth.log

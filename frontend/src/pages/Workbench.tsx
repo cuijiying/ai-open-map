@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Layout, message } from 'antd'
-import { api } from '../api'
+import { api, clearSession, loadSession } from '../api'
 import ChatPanel from '../components/ChatPanel'
 import JobPanel from '../components/JobPanel'
 import LayerPanel from '../components/LayerPanel'
@@ -428,7 +428,9 @@ export default function Workbench() {
       <Header className="topbar">
         <div className="brand">AI Open Map</div>
         <div className="top-status">{runningLabel}</div>
+        <span className="top-user">{loadSession()?.name}</span>
         <Button onClick={() => setModelOpen(true)}>模型配置</Button>
+        <Button onClick={() => { clearSession(); window.location.assign('/login') }}>退出</Button>
       </Header>
       <Layout className="body">
         <Sider width={320} theme="light" className="side">

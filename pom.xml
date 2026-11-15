@@ -24,6 +24,7 @@
         <module>backend/map-geo</module>
         <module>backend/map-ai</module>
         <module>backend/map-gateway</module>
+        <module>backend/map-auth</module>
     </modules>
 
     <properties>
@@ -35,6 +36,7 @@
         <mybatis-spring-boot.version>3.0.4</mybatis-spring-boot.version>
         <druid.version>1.2.23</druid.version>
         <springdoc.version>2.6.0</springdoc.version>
+        <jjwt.version>0.12.6</jjwt.version>
     </properties>
 
     <dependencyManagement>
@@ -72,6 +74,21 @@
                 <groupId>org.springdoc</groupId>
                 <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
                 <version>${springdoc.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-api</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-impl</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-jackson</artifactId>
+                <version>${jjwt.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

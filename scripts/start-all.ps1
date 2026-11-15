@@ -33,6 +33,7 @@ function Start-ServiceJar([string] $name, [int] $port) {
 }
 
 $env:OSM_DATA_DIR = Join-Path $root "data\osm"
+Start-ServiceJar "map-auth" 8084
 Start-ServiceJar "map-ingest" 8081
 Start-ServiceJar "map-geo" 8082
 Start-ServiceJar "map-ai" 8083

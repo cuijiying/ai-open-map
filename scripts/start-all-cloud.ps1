@@ -39,10 +39,11 @@ function Start-ServiceJar([string] $name, [int] $port) {
 $env:OSM_DATA_DIR = Join-Path $root "data\osm"
 if (-not $env:NACOS_ADDR) { $env:NACOS_ADDR = "127.0.0.1:8848" }
 
+Start-ServiceJar "map-auth" 8084
 Start-ServiceJar "map-ingest" 8081
 Start-ServiceJar "map-geo" 8082
 Start-ServiceJar "map-ai" 8083
 Start-ServiceJar "map-gateway" 8080
 
 Write-Host 'Gateway http://127.0.0.1:8080  |  Nacos http://127.0.0.1:8848/nacos'
-Write-Host 'Check Nacos service list for map-ingest, map-geo, map-ai, map-gateway'
+Write-Host 'Check Nacos service list for map-auth, map-ingest, map-geo, map-ai, map-gateway'
