@@ -20,7 +20,7 @@ public final class RegionSelection {
             return parsed;
         }
         if (region == null || region.isBlank()) {
-            return List.of("anhui");
+            return List.of();
         }
         return List.of(Regions.require(region).code());
     }

@@ -176,7 +176,7 @@ spring:
 
 ### 3.4 已知限制（0.1）
 
-- **map-ai → map-geo** 仍使用配置项 `app.geo.base-url`（默认 `http://127.0.0.1:8082`），cloud 模式**未**自动改为 `lb://map-geo`。若 geo 只通过 Nacos 暴露、端口变化，需自行改配置或经网关转发。
+- **map-ai → map-geo** 在 cloud 模式下使用 `http://map-geo`，由负载均衡客户端解析。非 cloud 模式仍是 `app.geo.base-url`（默认 `http://127.0.0.1:8082`）。
 - 单机 Nacos + 单实例每个服务时，`lb://` 与直连 808x 行为等价。
 
 ## 4. 配置说明（代码位置）

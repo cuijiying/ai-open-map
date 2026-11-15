@@ -106,10 +106,18 @@ public class RuleDialogueEngine {
             return style;
         }
         if (containsAny(text, "重置地图", "恢复默认")) {
-            Regions.Region current = Regions.orDefault(regionCode);
-            return Optional.of(new DialoguePlan("已恢复默认图层，并回到" + current.name() + "。", List.of(
+            Optional<Regions.Region> current = Regions.find(regionCode);
+            if (current.isEmpty()) {
+                return Optional.of(new DialoguePlan("已恢复默认图层，并回到全国范围。", List.of(
+                        action("only_layers", DEFAULT_LAYERS, null),
+                        new MapAction("fly_to", null, null, List.of(Regions.OVERVIEW_LON, Regions.OVERVIEW_LAT), Regions.OVERVIEW_ZOOM, "全国", null, null),
+                        action("clear_markers", null, null)
+                ), List.of()));
+            }
+            Regions.Region region = current.get();
+            return Optional.of(new DialoguePlan("已恢复默认图层，并回到" + region.name() + "。", List.of(
                     action("only_layers", DEFAULT_LAYERS, null),
-                    new MapAction("fly_to", null, null, List.of(current.lon(), current.lat()), current.zoom(), current.name(), null, current.code()),
+                    new MapAction("fly_to", null, null, List.of(region.lon(), region.lat()), region.zoom(), region.name(), null, region.code()),
                     action("clear_markers", null, null)
             ), List.of()));
         }

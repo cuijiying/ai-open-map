@@ -5,7 +5,9 @@ import com.aomap.common.dto.GeoDtos.AnalysisResult;
 import com.aomap.common.dto.GeoDtos.LayerCount;
 import com.aomap.common.dto.GeoDtos.SearchHit;
 import com.aomap.common.dto.GeoDtos.StatItem;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -18,8 +20,10 @@ public class GeoApi {
 
     private final RestClient client;
 
-    public GeoApi(@Value("${app.geo.base-url}") String baseUrl) {
-        this.client = RestClient.builder().baseUrl(baseUrl).build();
+    public GeoApi(@Autowired(required = false) @LoadBalanced RestClient.Builder builder,
+                  @Value("${app.geo.base-url}") String baseUrl) {
+        RestClient.Builder actual = builder == null ? RestClient.builder() : builder;
+        this.client = actual.baseUrl(baseUrl).build();
     }
 
     public List<LayerCount> layers(List<String> regions) {

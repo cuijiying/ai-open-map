@@ -1,3 +1,7 @@
+app:
+  geo:
+    base-url: ${GEO_BASE_URL:http://map-geo}
+
 spring:
   cloud:
     nacos:

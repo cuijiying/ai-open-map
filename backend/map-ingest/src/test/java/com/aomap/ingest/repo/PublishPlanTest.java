@@ -17,7 +17,7 @@ class PublishPlanTest {
         assertEquals(List.of("zhejiang", "anhui", "guangdong"), RegionSelection.parse("zhejiang, anhui, zhejiang, guangdong"));
         assertEquals(List.of("jiangsu", "shanghai"), RegionSelection.resolve("jiangsu,shanghai", "anhui"));
         assertEquals(List.of(), RegionSelection.resolve("  ", "anhui"));
-        assertEquals(List.of("anhui"), RegionSelection.resolve(null, null));
+        assertEquals(List.of(), RegionSelection.resolve(null, null));
         assertEquals(List.of("zhejiang"), RegionSelection.resolve(null, "Zhejiang"));
         assertThrows(IllegalArgumentException.class, () -> RegionSelection.resolve("not-a-province", null));
     }

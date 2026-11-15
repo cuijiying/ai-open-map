@@ -90,7 +90,7 @@ export default function JobPanel({
       ) : null}
       <div className="panel-title">
         <span>数据入库</span>
-        <Button type="primary" size="small" loading={loading || running} disabled={running} onClick={onStart}>
+        <Button type="primary" size="small" loading={loading || running} disabled={running || !regionCode} onClick={onStart}>
           下载
         </Button>
       </div>
@@ -99,14 +99,15 @@ export default function JobPanel({
           className="region-select region-select-inline"
           showSearch
           optionFilterProp="label"
-          value={regionCode}
+          placeholder="选择要下载的省份"
+          value={regionCode || undefined}
           options={regions.map((item) => ({
             value: item.code,
             label: item.featureCount > 0 ? `${item.name} · 已入库` : item.name
           }))}
           onChange={onRegionChange}
         />
-        <Button size="small" onClick={onLocate}>定位</Button>
+        <Button size="small" disabled={!regionCode} onClick={onLocate}>定位</Button>
       </div>
       <Select
         className="region-select"
@@ -146,9 +147,11 @@ export default function JobPanel({
         </Typography.Paragraph>
       ) : null}
       <Typography.Paragraph type="secondary" className="hint">
-        {selectedRegion && selectedRegion.featureCount > 0
-          ? `${selectedRegion.name}已有 ${selectedRegion.featureCount.toLocaleString('zh-CN')} 条要素。再次下载只替换该省分区，其他省的切片保持可用。`
-          : '该省尚未入库。下载完成后会加入地图。每天 03:00 自动更新安徽省。'}
+        {!selectedRegion
+          ? '请选择省份后再下载。每天 03:00 会按配置更新一个省。'
+          : selectedRegion.featureCount > 0
+            ? `${selectedRegion.name}已有 ${selectedRegion.featureCount.toLocaleString('zh-CN')} 条要素。再次下载只替换该省分区，其他省的切片保持可用。`
+            : `${selectedRegion.name}尚未入库。下载完成后会加入地图。`}
       </Typography.Paragraph>
       {job && (
         <>

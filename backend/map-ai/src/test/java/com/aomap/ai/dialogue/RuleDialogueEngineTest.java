@@ -21,6 +21,10 @@ class RuleDialogueEngineTest {
         MapAction back = reset.actions().stream().filter(action -> "fly_to".equals(action.type())).findFirst().orElseThrow();
         assertEquals(120.20, back.center().get(0), 0.01);
         assertTrue(reset.reply().contains("浙江省"));
+        DialoguePlan nationwide = engine.plan("重置地图").orElseThrow();
+        MapAction overview = nationwide.actions().stream().filter(action -> "fly_to".equals(action.type())).findFirst().orElseThrow();
+        assertEquals(104.195, overview.center().get(0), 0.01);
+        assertTrue(nationwide.reply().contains("全国"));
     }
 
     @Test

@@ -13,7 +13,8 @@ class RegionsTest {
     void acceptsSeveralProvincesAndSkipsUnknownCodes() {
         assertEquals(List.of("anhui", "zhejiang"), Regions.acceptedCodes(" anhui, Zhejiang ,missing"));
         assertEquals(List.of(), Regions.acceptedCodes("missing"));
-        assertEquals(List.of("anhui"), Regions.acceptedCodes(" "));
+        assertEquals(List.of(), Regions.acceptedCodes(" "));
+        assertThrows(IllegalArgumentException.class, () -> Regions.requireCodes(" "));
     }
 
     @Test

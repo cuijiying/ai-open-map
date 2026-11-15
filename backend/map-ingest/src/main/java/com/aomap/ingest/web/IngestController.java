@@ -33,7 +33,7 @@ public class IngestController {
     }
 
     @GetMapping("/sources")
-    public ApiResult<List<SourceOption>> sources(@RequestParam(defaultValue = "anhui") String region) {
+    public ApiResult<List<SourceOption>> sources(@RequestParam String region) {
         return ApiResult.ok(ingestService.sources(region));
     }
 

@@ -82,7 +82,10 @@ public class OsmIngestProperties {
     }
 
     public Region require(String code) {
-        String wanted = (code == null || code.isBlank()) ? "anhui" : code.trim();
+        if (code == null || code.isBlank()) {
+            throw new IllegalArgumentException("请选择省份");
+        }
+        String wanted = code.trim();
         return regions.stream()
                 .filter(region -> wanted.equalsIgnoreCase(region.getCode()))
                 .findFirst()

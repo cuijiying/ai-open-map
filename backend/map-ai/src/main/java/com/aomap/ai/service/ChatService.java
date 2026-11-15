@@ -213,7 +213,7 @@ public class ChatService {
             }
         }
         if (request == null || request.map() == null || request.map().regionCode() == null || request.map().regionCode().isBlank()) {
-            return "anhui";
+            return null;
         }
         return request.map().regionCode();
     }
@@ -257,7 +257,7 @@ public class ChatService {
             List<Double> box = request.map().bbox();
             return new double[]{box.get(0), box.get(1), box.get(2), box.get(3)};
         }
-        return new double[]{114.88, 29.39, 119.65, 34.65};
+        throw new IllegalArgumentException("请先在地图上确定视野");
     }
 
     private static String bboxText(ChatRequest request) {
