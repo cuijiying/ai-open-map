@@ -109,6 +109,25 @@ public class IngestService {
         return jobs.find(id);
     }
 
+    public JobView retry(long id) {
+        JobView existing = get(id);
+        if (!"FAILED".equals(existing.status()) && !"CANCELLED".equals(existing.status())) {
+            throw new IllegalStateException("只有失败或已取消的任务可以重试");
+        }
+        return start(existing.regionCode(), sourceIdOf(existing.regionCode(), existing.sourceUrl()), "MANUAL");
+    }
+
+    private static String sourceIdOf(String regionCode, String url) {
+        if (url == null || url.isBlank()) {
+            return OsmMirrors.AUTO;
+        }
+        return OsmMirrors.sources(Regions.require(regionCode)).stream()
+                .filter(source -> url.equals(source.pbfUrl()))
+                .map(Source::id)
+                .findFirst()
+                .orElse(OsmMirrors.AUTO);
+    }
+
     public JobView latest() {
         return jobs.latest();
     }

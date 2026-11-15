@@ -31,6 +31,7 @@ interface Props {
   onTest: () => void
   onStart: () => void
   onCancel: (id: number) => void
+  onRetry: (id: number) => void
 }
 
 function elapsedText(ms: number) {
@@ -40,9 +41,10 @@ function elapsedText(ms: number) {
 export default function JobPanel({
   regions, regionCode, mapRegions, sources, sourceId, probe, probing, job, logs, loading,
   activeCount, prebuild, prebuilding, onPrebuild,
-  onRegionChange, onMapRegionsChange, onFit, onLocate, onSourceChange, onTest, onStart, onCancel
+  onRegionChange, onMapRegionsChange, onFit, onLocate, onSourceChange, onTest, onStart, onCancel, onRetry
 }: Props) {
   const selectedActive = job != null && job.regionCode === regionCode && (job.status === 'QUEUED' || job.status === 'RUNNING')
+  const canRetry = job != null && job.regionCode === regionCode && (job.status === 'FAILED' || job.status === 'CANCELLED')
   const running = selectedActive
   const current = Math.max(0, PHASES.findIndex((item) => item.key === job?.phase))
   const selectedRegion = regions.find((item) => item.code === regionCode)
@@ -94,6 +96,9 @@ export default function JobPanel({
         <span className="panel-actions">
           {running && job ? (
             <Button size="small" onClick={() => onCancel(job.id)}>取消</Button>
+          ) : null}
+          {canRetry && job ? (
+            <Button size="small" disabled={loading} onClick={() => onRetry(job.id)}>重试</Button>
           ) : null}
           <Button type="primary" size="small" loading={loading || running} disabled={running || !regionCode} onClick={onStart}>
             下载

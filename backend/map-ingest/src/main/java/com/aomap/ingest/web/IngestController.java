@@ -66,6 +66,11 @@ public class IngestController {
         return ApiResult.ok(ingestService.cancel(id));
     }
 
+    @PostMapping("/jobs/{id}/retry")
+    public ApiResult<JobView> retry(@PathVariable long id) {
+        return ApiResult.ok(ingestService.retry(id));
+    }
+
     @GetMapping("/jobs/{id}")
     public ApiResult<JobView> get(@PathVariable long id) {
         return ApiResult.ok(ingestService.get(id));

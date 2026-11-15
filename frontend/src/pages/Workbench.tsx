@@ -282,6 +282,23 @@ export default function Workbench() {
     }
   }
 
+  async function retryJob(id: number) {
+    setStarting(true)
+    try {
+      const created = await api<JobView>(`/api/v1/ingest/jobs/${id}/retry`, { method: 'POST' })
+      setJob(created)
+      setActiveCount((count) => Math.max(count, 1))
+      if (!runningIdsRef.current.includes(created.id)) {
+        runningIdsRef.current = [...runningIdsRef.current, created.id]
+      }
+      message.success('已重新加入下载队列')
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '重试失败')
+    } finally {
+      setStarting(false)
+    }
+  }
+
   async function startJob() {
     const region = regions.find((item) => item.code === regionCode)
     setStarting(true)
@@ -485,6 +502,7 @@ export default function Workbench() {
             onTest={testSource}
             onStart={startJob}
             onCancel={cancelJob}
+            onRetry={retryJob}
           />
         </Sider>
         <Content className="map-content">
