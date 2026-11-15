@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Button, Layout, message } from 'antd'
+import { BgColorsOutlined, DatabaseOutlined, MessageOutlined, AppstoreOutlined } from '@ant-design/icons'
+import { Button, message } from 'antd'
 import { api, clearSession, loadSession } from '../api'
 import ChatPanel from '../components/ChatPanel'
 import JobPanel from '../components/JobPanel'
 import LayerPanel from '../components/LayerPanel'
 import MapView from '../components/MapView'
 import ModelModal from '../components/ModelModal'
+import ProjectMenu, { ProjectState } from '../components/ProjectMenu'
 import StylePanel from '../components/StylePanel'
 import { DEFAULT_VISIBLE, LAYERS } from '../layers'
 import { emptyOverrides, isThemeId, loadMapStyle, loadThemeOverrides, paintLayers, resetStoredStyles, resolveStyle, saveMapStyle, swatchOf, ThemeId } from '../mapStyle'
@@ -18,8 +20,6 @@ function loadSourceId() {
   const saved = localStorage.getItem(SOURCE_KEY)
   return saved === 'geofabrik' || saved === 'osm-france' ? saved : 'osm-france'
 }
-
-const { Header, Sider, Content } = Layout
 
 function initialVisible() {
   return Object.fromEntries(LAYERS.map((layer) => [layer.id, DEFAULT_VISIBLE.includes(layer.id)]))
@@ -61,6 +61,9 @@ export default function Workbench() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [chatting, setChatting] = useState(false)
   const [modelOpen, setModelOpen] = useState(false)
+  const [dock, setDock] = useState<'layers' | 'data' | 'style'>('layers')
+  const [dockOpen, setDockOpen] = useState(true)
+  const [assistantOpen, setAssistantOpen] = useState(true)
   const [markers, setMarkers] = useState<MarkerPoint[]>([])
   const [themeId, setThemeId] = useState<ThemeId>(() => loadMapStyle().themeId)
   const [styleOverrides, setStyleOverrides] = useState(() => loadMapStyle().overrides)
@@ -441,6 +444,21 @@ export default function Workbench() {
     }
   }
 
+  function applyProject(state: ProjectState) {
+    setMapRegions(state.regions ?? [])
+    if (state.center && state.center.length === 2 && typeof state.zoom === 'number') {
+      flyTo(state.center, state.zoom)
+    }
+    setVisible(state.visible ?? initialVisible())
+    setFilters(state.filters ?? {})
+    if (isThemeId(state.themeId)) {
+      setThemeId(state.themeId)
+      setStyleOverrides(state.styleOverrides ?? loadThemeOverrides(state.themeId))
+    }
+    setMarkers(state.markers ?? [])
+    message.success('已打开项目')
+  }
+
   const runningLabel = useMemo(() => {
     if (job?.status === 'QUEUED' || job?.status === 'RUNNING') {
       return `${job.message ?? '正在入库'} · 地图仍显示 ${mapLabel}`
@@ -451,83 +469,139 @@ export default function Workbench() {
     return mapLabel
   }, [activeCount, job, mapLabel])
 
+  function chooseDock(next: 'layers' | 'data' | 'style') {
+    if (dockOpen && dock === next) {
+      setDockOpen(false)
+      return
+    }
+    setDock(next)
+    setDockOpen(true)
+  }
+
+  const session = loadSession()
+
   return (
-    <Layout className="app">
-      <Header className="topbar">
-        <div className="brand">AI Open Map</div>
-        <div className="top-status">{runningLabel}</div>
-        <span className="top-user">{loadSession()?.name}</span>
-        <Button onClick={() => setModelOpen(true)}>模型配置</Button>
-        <Button onClick={() => { clearSession(); window.location.assign('/login') }}>退出</Button>
-      </Header>
-      <Layout className="body">
-        <Sider width={320} theme="light" className="side">
-          <StylePanel
-            themeId={themeId}
-            overrides={styleOverrides}
-            resolvedTokens={mapStyle.tokens}
-            resolvedOpacity={mapStyle.numbers}
-            widthScale={mapStyle.widthScale}
-            labels={mapStyle.labels}
-            basemap={mapStyle.basemap}
-            onTheme={chooseTheme}
-            onOverrides={setStyleOverrides}
+    <div className={`stage${dockOpen ? ' dock-open' : ''}${assistantOpen ? ' assistant-open' : ''}`}>
+      <div className="map-content">
+        <MapView
+          visible={visible}
+          filters={filters}
+          markers={markers}
+          regions={mapRegions}
+          regionNames={Object.fromEntries(regions.map((item) => [item.code, item.name]))}
+          notice={mapNotice}
+          tileRevision={tileRevision}
+          flyToken={flyToken}
+          bounds={bounds}
+          boundsToken={boundsToken}
+          center={center}
+          zoom={zoom}
+          style={mapStyle}
+          onBounds={(bbox) => setBbox(bbox)}
+        />
+      </div>
+      <header className="command">
+        <div className="brand">
+          <span className="brand-mark" aria-hidden="true" />
+          <span>GeoMind</span>
+        </div>
+        <div className="status-pill" title={runningLabel}>{runningLabel}</div>
+        <div className="command-actions">
+          <ProjectMenu
+            snapshot={() => ({
+              regions: mapRegions,
+              center,
+              zoom,
+              visible,
+              filters,
+              themeId,
+              styleOverrides,
+              markers
+            })}
+            onLoad={(_name, state) => applyProject(state)}
           />
-          <LayerPanel counts={counts} visible={visible} swatches={swatches} onToggle={(layer, checked) => {
-            setVisible((current) => ({ ...current, [layer]: checked }))
-            if (checked) {
-              setFilters((current) => ({ ...current, [layer]: undefined }))
-            }
-          }} />
-          <JobPanel
-            regions={regions}
-            regionCode={regionCode}
-            mapRegions={mapRegions}
-            sources={sources}
-            sourceId={sourceId}
-            probe={probe}
-            probing={probing}
-            job={job}
-            logs={logs}
-            loading={starting}
-            activeCount={activeCount}
-            prebuild={prebuild}
-            prebuilding={prebuilding}
-            onPrebuild={startPrebuild}
-            onRegionChange={chooseRegion}
-            onMapRegionsChange={changeMapRegions}
-            onFit={fitMapRegions}
-            onLocate={() => locateRegion(regionCode)}
-            onSourceChange={chooseSource}
-            onTest={testSource}
-            onStart={startJob}
-            onCancel={cancelJob}
-            onRetry={retryJob}
-          />
-        </Sider>
-        <Content className="map-content">
-          <MapView
-            visible={visible}
-            filters={filters}
-            markers={markers}
-            regions={mapRegions}
-            regionNames={Object.fromEntries(regions.map((item) => [item.code, item.name]))}
-            notice={mapNotice}
-            tileRevision={tileRevision}
-            flyToken={flyToken}
-            bounds={bounds}
-            boundsToken={boundsToken}
-            center={center}
-            zoom={zoom}
-            style={mapStyle}
-            onBounds={(bbox) => setBbox(bbox)}
-          />
-        </Content>
-        <Sider width={380} theme="light" className="side">
-          <ChatPanel messages={messages} loading={chatting} onSend={send} />
-        </Sider>
-      </Layout>
+          <Button className="cmd" onClick={() => setModelOpen(true)}>模型</Button>
+          <span className="user-chip">{session?.name}</span>
+          <Button className="cmd" onClick={() => { clearSession(); window.location.assign('/login') }}>退出</Button>
+        </div>
+      </header>
+      <nav className="rail" aria-label="工作台">
+        <button type="button" className={dockOpen && dock === 'layers' ? 'rail-btn on' : 'rail-btn'} onClick={() => chooseDock('layers')}>
+          <AppstoreOutlined />
+          <span>图层</span>
+        </button>
+        <button type="button" className={dockOpen && dock === 'data' ? 'rail-btn on' : 'rail-btn'} onClick={() => chooseDock('data')}>
+          <DatabaseOutlined />
+          <span>数据</span>
+        </button>
+        <button type="button" className={dockOpen && dock === 'style' ? 'rail-btn on' : 'rail-btn'} onClick={() => chooseDock('style')}>
+          <BgColorsOutlined />
+          <span>风格</span>
+        </button>
+      </nav>
+      {dockOpen ? (
+        <aside className="sheet">
+          {dock === 'layers' ? (
+            <LayerPanel counts={counts} visible={visible} swatches={swatches} onToggle={(layer, checked) => {
+              setVisible((current) => ({ ...current, [layer]: checked }))
+              if (checked) {
+                setFilters((current) => ({ ...current, [layer]: undefined }))
+              }
+            }} />
+          ) : null}
+          {dock === 'data' ? (
+            <JobPanel
+              regions={regions}
+              regionCode={regionCode}
+              mapRegions={mapRegions}
+              sources={sources}
+              sourceId={sourceId}
+              probe={probe}
+              probing={probing}
+              job={job}
+              logs={logs}
+              loading={starting}
+              activeCount={activeCount}
+              prebuild={prebuild}
+              prebuilding={prebuilding}
+              onPrebuild={startPrebuild}
+              onRegionChange={chooseRegion}
+              onMapRegionsChange={changeMapRegions}
+              onFit={fitMapRegions}
+              onLocate={() => locateRegion(regionCode)}
+              onSourceChange={chooseSource}
+              onTest={testSource}
+              onStart={startJob}
+              onCancel={cancelJob}
+              onRetry={retryJob}
+            />
+          ) : null}
+          {dock === 'style' ? (
+            <StylePanel
+              themeId={themeId}
+              overrides={styleOverrides}
+              resolvedTokens={mapStyle.tokens}
+              resolvedOpacity={mapStyle.numbers}
+              widthScale={mapStyle.widthScale}
+              labels={mapStyle.labels}
+              basemap={mapStyle.basemap}
+              onTheme={chooseTheme}
+              onOverrides={setStyleOverrides}
+            />
+          ) : null}
+        </aside>
+      ) : null}
+      {assistantOpen ? (
+        <aside className="assistant">
+          <ChatPanel messages={messages} loading={chatting} onSend={send} onClose={() => setAssistantOpen(false)} />
+        </aside>
+      ) : (
+        <button type="button" className="assistant-launcher" onClick={() => setAssistantOpen(true)}>
+          <MessageOutlined />
+          问地图
+        </button>
+      )}
       <ModelModal open={modelOpen} onClose={() => setModelOpen(false)} />
-    </Layout>
+    </div>
   )
 }

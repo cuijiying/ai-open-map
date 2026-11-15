@@ -1,4 +1,4 @@
-import { Button, Input, Table } from 'antd'
+import { Input, Table } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 import { ChatMessage } from '../types'
 
@@ -6,11 +6,12 @@ interface Props {
   messages: ChatMessage[]
   loading: boolean
   onSend: (text: string) => void
+  onClose?: () => void
 }
 
 const QUICK = ['显示道路和水系', '定位到合肥', '切换深色风格', '切换影像风格', '只显示高速公路', '统计各类数据数量', '查找大学', '重置地图']
 
-export default function ChatPanel({ messages, loading, onSend }: Props) {
+export default function ChatPanel({ messages, loading, onSend, onClose }: Props) {
   const [text, setText] = useState('')
   const bottom = useRef<HTMLDivElement>(null)
 
@@ -29,14 +30,22 @@ export default function ChatPanel({ messages, loading, onSend }: Props) {
 
   return (
     <section className="chat">
-      <div className="panel-title"><span>地图对话</span></div>
+      <div className="panel-title">
+        <span>地图助手</span>
+        {onClose ? <button type="button" className="icon-x" onClick={onClose} aria-label="收起助手">×</button> : null}
+      </div>
       <div className="quick">
         {QUICK.map((item) => (
-          <Button key={item} size="small" onClick={() => send(item)}>{item}</Button>
+          <button key={item} type="button" className="chip" onClick={() => send(item)}>{item}</button>
         ))}
       </div>
       <div className="messages">
-        {messages.length === 0 && <div className="hint">可以直接说“定位到杭州”“切换深色风格”或“把道路改成红色”。统计和查找针对地图上同时显示的省份。</div>}
+        {messages.length === 0 && (
+          <div className="empty-ask">
+            <strong>直接说你要看的地方</strong>
+            <p>例如“定位到杭州”“只显示高速公路”，或“把道路改成红色”。统计和查找针对当前勾选的省份。</p>
+          </div>
+        )}
         {messages.map((message, index) => (
           <div key={index} className={`bubble ${message.role}`}>
             <div className="bubble-text">{message.content}</div>
