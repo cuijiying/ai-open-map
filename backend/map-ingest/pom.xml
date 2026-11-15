@@ -50,6 +50,10 @@
             <artifactId>postgresql</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.openstreetmap.osmosis</groupId>
             <artifactId>osmosis-pbf</artifactId>
             <version>0.48.3</version>
@@ -67,17 +71,6 @@
     </dependencies>
 
     <build>
-        <resources>
-            <resource>
-                <directory>src/main/resources</directory>
-            </resource>
-            <resource>
-                <directory>${project.basedir}/../../sql</directory>
-                <includes>
-                    <include>schema.sql</include>
-                </includes>
-            </resource>
-        </resources>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>

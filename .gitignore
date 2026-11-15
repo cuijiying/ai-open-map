@@ -12,4 +12,5 @@ data/tiles/**
 *.iml
 .DS_Store
 *.log
+*.rar
 tools/nacos-server/

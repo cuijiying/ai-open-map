@@ -10,11 +10,12 @@ spring:
     druid:
       name: map-ingest
       max-active: 16
-  sql:
-    init:
-      mode: always
-      encoding: UTF-8
-      schema-locations: classpath:schema.sql
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # 已有库没有 flyway 历史表时先记为 0 版本，再执行可重复的基线脚本。
+    baseline-on-migrate: true
+    baseline-version: 0
   cloud:
     nacos:
       discovery:
