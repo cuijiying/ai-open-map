@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aomap.workspace.mapper.ProjectMapper">
+
+    <select id="list" resultType="com.aomap.workspace.domain.ProjectRow">
+        SELECT id, org_id, owner_user_id, name, state::text AS state, updated_at
+        FROM map_project
+        WHERE org_id = #{orgId}
+        ORDER BY updated_at DESC, id DESC
+        LIMIT 100
+    </select>
+
+    <select id="find" resultType="com.aomap.workspace.domain.ProjectRow">
+        SELECT id, org_id, owner_user_id, name, state::text AS state, updated_at
+        FROM map_project
+        WHERE org_id = #{orgId} AND id = #{id}
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO map_project (org_id, owner_user_id, name, state)
+        VALUES (#{orgId}, #{ownerUserId}, #{name}, CAST(#{state} AS jsonb))
+    </insert>
+
+    <update id="update">
+        UPDATE map_project
+        SET name = #{name},
+            state = CAST(#{state} AS jsonb),
+            updated_at = now()
+        WHERE org_id = #{orgId} AND id = #{id}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM map_project
+        WHERE org_id = #{orgId} AND id = #{id}
+    </delete>
+
+    <insert id="insertShare">
+        INSERT INTO map_share (project_id, token, password_hash, expires_at)
+        VALUES (#{projectId}, #{token}, #{passwordHash}, #{expiresAt})
+    </insert>
+
+    <select id="findShare" resultType="com.aomap.workspace.domain.ShareRow">
+        SELECT s.token, s.project_id, s.password_hash, s.expires_at, p.name, p.state::text AS state
+        FROM map_share s
+        JOIN map_project p ON p.id = s.project_id
+        WHERE s.token = #{token}
+    </select>
+</mapper>

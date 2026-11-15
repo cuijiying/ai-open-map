@@ -25,6 +25,7 @@
         <module>backend/map-ai</module>
         <module>backend/map-gateway</module>
         <module>backend/map-auth</module>
+        <module>backend/map-workspace</module>
     </modules>
 
     <properties>

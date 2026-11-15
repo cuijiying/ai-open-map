@@ -1,6 +1,6 @@
 ﻿$ErrorActionPreference = "Stop"
 $procs = Get-CimInstance Win32_Process -Filter "Name = 'java.exe'" |
-    Where-Object { $_.CommandLine -match "map-(auth|ingest|geo|ai|gateway)-0\.1\.0\.jar" }
+    Where-Object { $_.CommandLine -match "map-(auth|workspace|ingest|geo|ai|gateway)-0\.1\.0\.jar" }
 foreach ($proc in $procs) {
     Stop-Process -Id $proc.ProcessId -Force
     Write-Host "已停止 $($proc.ProcessId) $($proc.CommandLine)"

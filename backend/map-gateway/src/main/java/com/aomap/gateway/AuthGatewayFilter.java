@@ -50,6 +50,7 @@ public class AuthGatewayFilter implements GlobalFilter, Ordered {
     private static boolean isPublic(String path) {
         return path.startsWith("/api/v1/auth/login")
                 || path.startsWith("/api/v1/auth/register")
+                || path.startsWith("/api/v1/shares/")
                 || path.startsWith("/actuator");
     }
 

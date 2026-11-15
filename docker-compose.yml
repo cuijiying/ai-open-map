@@ -111,6 +111,29 @@ services:
       retries: 20
       start_period: 40s
 
+  map-workspace:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+      args:
+        MODULE: map-workspace
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/ai_open_map
+      DB_USER: postgres
+      DB_PASSWORD: post
+      AUTH_JWT_SECRET: aomap-local-dev-secret-change-me
+    ports:
+      - "8085:8085"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8085/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+
   map-gateway:
     build:
       context: .
@@ -123,6 +146,8 @@ services:
       AUTH_JWT_SECRET: aomap-local-dev-secret-change-me
     depends_on:
       map-auth:
+        condition: service_healthy
+      map-workspace:
         condition: service_healthy
       map-ingest:
         condition: service_healthy
