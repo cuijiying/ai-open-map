@@ -16,6 +16,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -184,6 +185,7 @@ public class FeatureRepository {
             connection.setAutoCommit(false);
             try {
                 boolean replace = partitionExists(connection, partition);
+                copyParentChecks(connection, build);
                 try (Statement statement = connection.createStatement()) {
                     for (String sql : PublishSql.swap(partition, build, retired, code, replace)) {
                         statement.execute(sql);
@@ -204,6 +206,32 @@ public class FeatureRepository {
             statement.execute(PublishSql.drop(retired));
         } catch (SQLException ex) {
             log.warn("省份 {} 已切换，整理统计信息失败: {}", code, ex.getMessage());
+        }
+    }
+
+    private static void copyParentChecks(Connection connection, String table) throws SQLException {
+        List<String> names = new ArrayList<>();
+        List<String> definitions = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT conname, pg_get_constraintdef(oid)
+                  FROM pg_constraint
+                 WHERE conrelid = 'public.osm_feature'::regclass
+                   AND contype = 'c'
+                 ORDER BY conname
+                """)) {
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) {
+                    names.add(rs.getString(1));
+                    definitions.add(rs.getString(2));
+                }
+            }
+        }
+        try (Statement statement = connection.createStatement()) {
+            for (int i = 0; i < names.size(); i++) {
+                for (String sql : PublishSql.copyCheck(table, names.get(i), definitions.get(i))) {
+                    statement.execute(sql);
+                }
+            }
         }
     }
 

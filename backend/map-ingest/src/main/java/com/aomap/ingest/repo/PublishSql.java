@@ -69,6 +69,32 @@ public final class PublishSql {
         );
     }
 
+    /**
+     * 挂分区时 PostgreSQL 按约束名和表达式树核对父表。
+     * 把 pg_get_constraintdef 的结果再执行一遍，会写成另一种等价形式，挂分区时报定义不同。
+     * 这里按建表时的 IN 列表重建，名称沿用父表。
+     */
+    public static String equivalentCheck(String parentDefinition) {
+        if (parentDefinition != null && parentDefinition.contains("(layer)")) {
+            return "CHECK (layer IN ('highway', 'railway', 'waterway', 'water', 'building', 'landuse', 'boundary', 'poi', 'place'))";
+        }
+        if (parentDefinition != null && parentDefinition.contains("(osm_type)")) {
+            return "CHECK (osm_type IN ('node', 'way', 'relation'))";
+        }
+        throw new IllegalArgumentException("无法复制检查约束");
+    }
+
+    public static List<String> copyCheck(String table, String name, String definition) {
+        if (!name.matches("[a-z0-9_]+")) {
+            throw new IllegalArgumentException("无法复制检查约束");
+        }
+        String check = equivalentCheck(definition);
+        return List.of(
+                "ALTER TABLE " + table + " DROP CONSTRAINT IF EXISTS " + name,
+                "ALTER TABLE " + table + " ADD CONSTRAINT " + name + " " + check
+        );
+    }
+
     public static List<String> swap(String partition, String build, String retired, String code, boolean replace) {
         List<String> statements = new ArrayList<>();
         statements.add("SET LOCAL lock_timeout = '15s'");

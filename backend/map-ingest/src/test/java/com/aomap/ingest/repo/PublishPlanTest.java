@@ -61,6 +61,19 @@ class PublishPlanTest {
     }
 
     @Test
+    void copyCheckUsesTheParentConstraintName() {
+        String parent = "CHECK (((layer)::text = ANY ((ARRAY['highway'::character varying])::text[])))";
+        List<String> sql = PublishSql.copyCheck("osm_feature_b_anhui", "ck_osm_feature_next_layer", parent);
+        assertEquals(List.of(
+                "ALTER TABLE osm_feature_b_anhui DROP CONSTRAINT IF EXISTS ck_osm_feature_next_layer",
+                "ALTER TABLE osm_feature_b_anhui ADD CONSTRAINT ck_osm_feature_next_layer CHECK (layer IN ('highway', 'railway', 'waterway', 'water', 'building', 'landuse', 'boundary', 'poi', 'place'))"
+        ), sql);
+        assertTrue(PublishSql.equivalentCheck("CHECK (((osm_type)::text = ANY (ARRAY['node'::text])))").contains("osm_type"));
+        assertThrows(IllegalArgumentException.class, () -> PublishSql.copyCheck("osm_feature_b_anhui", "bad-name", parent));
+        assertThrows(IllegalArgumentException.class, () -> PublishSql.equivalentCheck("CHECK (true)"));
+    }
+
+    @Test
     void rejectsCodesThatAreNotProvinces() {
         assertEquals("osm_feature_p_xinjiang", FeatureTables.partition("xinjiang"));
         assertThrows(IllegalArgumentException.class, () -> FeatureTables.partition("anhui;drop"));
