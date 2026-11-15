@@ -85,6 +85,7 @@ export interface ModelView {
   apiKeyMasked: string
   hasKey: boolean
   model: string
+  protocol: 'chat' | 'responses' | string
   temperature: number
   enabled: boolean
 }
@@ -122,7 +123,8 @@ export interface ChatResponse {
 }
 
 export interface ChatMessage {
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'error'
   content: string
   tables?: DataTable[]
+  source?: string
 }

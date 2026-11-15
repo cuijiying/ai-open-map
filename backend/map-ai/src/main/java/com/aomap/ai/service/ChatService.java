@@ -23,14 +23,17 @@ import java.util.Locale;
 public class ChatService {
 
     private static final String SYSTEM = """
-            你是 WebGIS 地图助手，只能用 JSON 控制地图，不要输出其它文字。
+            你是 WebGIS 地图助手，只能输出一个 JSON 对象，不要 markdown，不要其它文字。
             可用图层：highway 道路，railway 铁路，waterway 水系线，water 水体，building 建筑，landuse 土地利用，boundary 行政区划，poi 兴趣点，place 地名。
-            输出格式：{"reply":"中文说明","actions":[{"type":"show_layers","layers":["highway"]}],"followUps":[{"kind":"search","keyword":"大学","layer":"poi"}]}
+            输出格式：{"reply":"中文说明","actions":[],"followUps":[]}
+            用户没有要求操作地图时，actions 和 followUps 必须是空数组，只在 reply 里回答。
+            不要主动查找、统计、定位或切换图层。
             action.type 只能是 show_layers、hide_layers、only_layers、fly_to、clear_markers、set_style、paint_layer。
             fly_to 需要 center:[经度,纬度] 和 zoom。
             set_style 用 label 指定风格：light、dark、voyager、paper、imagery、plain。
             paint_layer 用 layers 指定图层，label 指定 #RRGGBB。
             followUps.kind 只能是 stats、layers、search、analyze。analyze 需要 layer 和 metric（count、length、area）。
+            只有用户明确要求统计、查找或分析时才填写对应的 followUps。
             """;
 
     private final RuleDialogueEngine rules = new RuleDialogueEngine();
@@ -60,7 +63,7 @@ public class ChatService {
             return new ChatResponse(RuleDialogueEngine.HELP, "rule", List.of(), List.of());
         }
         String content = llmClient.complete(model.getBaseUrl(), model.getApiKey(), model.getModel(),
-                model.getTemperature() == null ? 0.2 : model.getTemperature(), prompt(request, text));
+                model.getTemperature() == null ? 0.2 : model.getTemperature(), model.getProtocol(), prompt(request, text));
         return finish(parseModel(content), "model", request);
     }
 

@@ -394,7 +394,9 @@ export default function Workbench() {
       const result = await api<ChatResponse>('/api/v1/ai/chat', {
         method: 'POST',
         body: JSON.stringify({
-          messages: history.map((item) => ({ role: item.role, content: item.content })),
+          messages: history
+            .filter((item) => item.role !== 'error')
+            .map((item) => ({ role: item.role, content: item.content })),
           map: {
             center,
             zoom,
@@ -406,9 +408,9 @@ export default function Workbench() {
         })
       })
       applyActions(result.actions ?? [])
-      setMessages([...history, { role: 'assistant', content: result.reply, tables: result.tables }])
+      setMessages([...history, { role: 'assistant', content: result.reply, tables: result.tables, source: result.source }])
     } catch (error) {
-      setMessages([...history, { role: 'assistant', content: error instanceof Error ? error.message : '对话失败' }])
+      setMessages([...history, { role: 'error', content: error instanceof Error ? error.message : '对话失败' }])
     } finally {
       setChatting(false)
     }

@@ -9,6 +9,7 @@ public class ModelRecord {
     private String baseUrl;
     private String apiKey;
     private String model;
+    private String protocol;
     private Double temperature;
     private Boolean enabled;
     private Timestamp updatedAt;
@@ -51,6 +52,14 @@ public class ModelRecord {
 
     public void setModel(String model) {
         this.model = model;
+    }
+
+    public String getProtocol() {
+        return protocol;
+    }
+
+    public void setProtocol(String protocol) {
+        this.protocol = protocol;
     }
 
     public Double getTemperature() {

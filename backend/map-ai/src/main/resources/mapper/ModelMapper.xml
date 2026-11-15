@@ -4,7 +4,7 @@
 <mapper namespace="com.aomap.ai.mapper.ModelMapper">
 
     <sql id="columns">
-        id, name, base_url, api_key, model, temperature, enabled, updated_at
+        id, name, base_url, api_key, model, protocol, temperature, enabled, updated_at
     </sql>
 
     <select id="list" resultType="com.aomap.ai.domain.ModelRecord">
@@ -20,8 +20,8 @@
     </select>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
-        INSERT INTO ai_model_config (name, base_url, api_key, model, temperature, enabled)
-        VALUES (#{name}, #{baseUrl}, #{apiKey}, #{model}, #{temperature}, #{enabled})
+        INSERT INTO ai_model_config (name, base_url, api_key, model, protocol, temperature, enabled)
+        VALUES (#{name}, #{baseUrl}, #{apiKey}, #{model}, #{protocol}, #{temperature}, #{enabled})
     </insert>
 
     <update id="update">
@@ -30,6 +30,7 @@
                base_url = #{baseUrl},
                api_key = #{apiKey},
                model = #{model},
+               protocol = #{protocol},
                temperature = #{temperature},
                updated_at = now()
          WHERE id = #{id}

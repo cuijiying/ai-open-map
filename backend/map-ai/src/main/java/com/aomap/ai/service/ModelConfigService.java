@@ -71,6 +71,7 @@ public class ModelConfigService {
                 key,
                 form.model(),
                 form.temperature() == null ? 0.2 : form.temperature(),
+                protocol(form.protocol()),
                 List.of(new LlmClient.Message("user", "只回复OK"))
         );
         return content.length() > 80 ? content.substring(0, 80) : content;
@@ -98,6 +99,17 @@ public class ModelConfigService {
         if (form.model() == null || form.model().isBlank()) {
             throw new IllegalArgumentException("请填写模型名称");
         }
+        protocol(form.protocol());
+    }
+
+    static String protocol(String value) {
+        if (value == null || value.isBlank() || "chat".equalsIgnoreCase(value.trim())) {
+            return "chat";
+        }
+        if ("responses".equalsIgnoreCase(value.trim())) {
+            return "responses";
+        }
+        throw new IllegalArgumentException("接口类型只能是对话补全或 Responses");
     }
 
     private static void copy(ModelForm form, ModelRecord record, String apiKey) {
@@ -105,6 +117,7 @@ public class ModelConfigService {
         record.setBaseUrl(form.baseUrl().trim());
         record.setApiKey(apiKey == null ? "" : apiKey.trim());
         record.setModel(form.model().trim());
+        record.setProtocol(protocol(form.protocol()));
         record.setTemperature(form.temperature() == null ? 0.2 : form.temperature());
     }
 
@@ -116,6 +129,7 @@ public class ModelConfigService {
                 mask(record.getApiKey()),
                 record.getApiKey() != null && !record.getApiKey().isBlank(),
                 record.getModel(),
+                protocol(record.getProtocol()),
                 record.getTemperature() == null ? 0.2 : record.getTemperature(),
                 Boolean.TRUE.equals(record.getEnabled())
         );
@@ -131,10 +145,10 @@ public class ModelConfigService {
         return "****" + key.substring(key.length() - 4);
     }
 
-    public record ModelForm(Long id, String name, String baseUrl, String apiKey, String model, Double temperature) {
+    public record ModelForm(Long id, String name, String baseUrl, String apiKey, String model, String protocol, Double temperature) {
     }
 
     public record ModelView(long id, String name, String baseUrl, String apiKeyMasked, boolean hasKey,
-                            String model, double temperature, boolean enabled) {
+                            String model, String protocol, double temperature, boolean enabled) {
     }
 }
