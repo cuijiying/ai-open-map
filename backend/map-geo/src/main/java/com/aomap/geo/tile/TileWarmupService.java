@@ -1,6 +1,7 @@
 package com.aomap.geo.tile;
 
 import com.aomap.geo.mapper.TileMapper;
+import com.aomap.geo.service.TileQuery;
 import com.aomap.geo.tile.NationalTileStore.Manifest;
 import com.aomap.geo.tile.Slippy.Tile;
 import jakarta.annotation.PreDestroy;
@@ -27,7 +28,8 @@ public class TileWarmupService {
             "highway", "railway", "waterway", "water", "boundary", "place"
     );
 
-    private final TileMapper tiles;
+    private final TileQuery tiles;
+    private final TileMapper regions;
     private final NationalTileStore store;
     private final ExecutorService executor = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "national-tiles");
@@ -37,8 +39,9 @@ public class TileWarmupService {
     private final AtomicBoolean running = new AtomicBoolean();
     private volatile PrebuildStatus status;
 
-    public TileWarmupService(TileMapper tiles, NationalTileStore store) {
+    public TileWarmupService(TileQuery tiles, TileMapper regions, NationalTileStore store) {
         this.tiles = tiles;
+        this.regions = regions;
         this.store = store;
     }
 
@@ -114,7 +117,7 @@ public class TileWarmupService {
     }
 
     private List<String> publishedRegions() {
-        List<String> rows = tiles.publishedRegions();
+        List<String> rows = regions.publishedRegions();
         if (rows == null || rows.isEmpty()) {
             return List.of();
         }

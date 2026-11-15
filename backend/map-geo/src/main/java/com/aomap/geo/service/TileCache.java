@@ -4,7 +4,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * 拖动和缩放会反复请求同一块瓦片。短时缓存挡住这些重复查询，容量有上限。
+ * 拖动和缩放会反复请求同一块瓦片。缓存挡住这些重复查询，容量有上限。
  */
 public final class TileCache {
 

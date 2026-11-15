@@ -2,7 +2,6 @@ package com.aomap.geo.service;
 
 import com.aomap.common.geo.Layers;
 import com.aomap.common.geo.Regions;
-import com.aomap.geo.mapper.TileMapper;
 import com.aomap.geo.tile.NationalTileStore;
 import org.springframework.stereotype.Service;
 
@@ -12,16 +11,16 @@ import java.util.List;
 @Service
 public class TileService {
 
-    private final TileMapper tiles;
+    private final TileQuery tiles;
     private final NationalTileStore nationalTiles;
-    private final TileCache cache = new TileCache(400, 30_000);
+    private final TileCache cache = new TileCache(8192, 600_000);
 
-    public TileService(TileMapper tiles, NationalTileStore nationalTiles) {
+    public TileService(TileQuery tiles, NationalTileStore nationalTiles) {
         this.tiles = tiles;
         this.nationalTiles = nationalTiles;
     }
 
-    public byte[] tile(String regions, String layer, int z, int x, int y) {
+    public byte[] tile(String regions, String layer, int z, int x, int y, String revision) {
         if (!Layers.known(layer) || z < 0 || z > 16) {
             return new byte[0];
         }
@@ -33,7 +32,8 @@ public class TileService {
         if (codes.isEmpty()) {
             return new byte[0];
         }
-        String key = layer + "/" + z + "/" + x + "/" + y + "/" + String.join(",", codes.stream().sorted().toList());
+        String version = revision == null ? "" : revision;
+        String key = layer + "/" + z + "/" + x + "/" + y + "/" + String.join(",", codes.stream().sorted().toList()) + "@" + version;
         long now = System.currentTimeMillis();
         byte[] cached = cache.get(key, now);
         if (cached != null) {

@@ -10,5 +10,7 @@ public interface TileMapper {
 
     String mvt(@Param("regions") List<String> regions, @Param("layer") String layer, @Param("z") int z, @Param("x") int x, @Param("y") int y);
 
+    String mvtCity(@Param("regions") List<String> regions, @Param("layer") String layer, @Param("z") int z, @Param("x") int x, @Param("y") int y);
+
     List<String> publishedRegions();
 }

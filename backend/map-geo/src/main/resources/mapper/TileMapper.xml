@@ -3,38 +3,7 @@
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.aomap.geo.mapper.TileMapper">
 
-    <select id="mvt" resultType="string">
-        WITH bounds AS (
-            SELECT ST_TileEnvelope(#{z}, #{x}, #{y}) AS g3857,
-                   ST_Transform(ST_TileEnvelope(#{z}, #{x}, #{y}), 4326) AS g4326
-        ),
-        rows AS (
-            SELECT ST_AsMVTGeom(
-                       ST_Transform(
-                           <choose>
-                               <when test="layer == 'place' or layer == 'poi'">
-                                   f.geom
-                               </when>
-                               <otherwise>
-                                   CASE
-                                       WHEN #{z} &lt;= 8 THEN ST_SimplifyPreserveTopology(f.geom, 0.002)
-                                       WHEN #{z} &lt;= 11 THEN ST_SimplifyPreserveTopology(f.geom, 0.00035)
-                                       ELSE f.geom
-                                   END
-                               </otherwise>
-                           </choose>,
-                           3857
-                       ),
-                       b.g3857, 4096, 64, true
-                   ) AS geom,
-                   COALESCE(f.name, '') AS name,
-                   f.sub_type AS subtype,
-                   f.layer AS layer,
-                   f.region_code AS region,
-                   CAST(f.osm_id AS text) AS osm_id
-              FROM osm_feature f
-              CROSS JOIN bounds b
-             WHERE f.layer = #{layer}
+    <sql id="tileFilters">
                AND f.region_code IN
                <foreach collection="regions" item="code" open="(" separator="," close=")">
                    #{code}
@@ -83,8 +52,82 @@
                     OR f.sub_type IN ('city','town')
                )
             </if>
+    </sql>
+
+    <sql id="sourceGeom">
+        <choose>
+            <when test="layer == 'place' or layer == 'poi'">
+                f.geom
+            </when>
+            <otherwise>
+                CASE
+                    WHEN #{z} &lt;= 8 THEN ST_SimplifyPreserveTopology(f.geom, 0.002)
+                    WHEN #{z} &lt;= 11 THEN ST_SimplifyPreserveTopology(f.geom, 0.00035)
+                    ELSE f.geom
+                END
+            </otherwise>
+        </choose>
+    </sql>
+
+    <!-- 省域瓦片覆盖大，交给并行位图计划。 -->
+    <select id="mvt" resultType="string">
+        WITH bounds AS (
+            SELECT ST_TileEnvelope(#{z}, #{x}, #{y}) AS g3857,
+                   ST_Transform(ST_TileEnvelope(#{z}, #{x}, #{y}), 4326) AS g4326
+        ),
+        rows AS (
+            SELECT ST_AsMVTGeom(
+                       ST_Transform(<include refid="sourceGeom"/>, 3857),
+                       b.g3857, 4096, 64, true
+                   ) AS geom,
+                   COALESCE(f.name, '') AS name,
+                   f.sub_type AS subtype,
+                   f.layer AS layer,
+                   f.region_code AS region,
+                   CAST(f.osm_id AS text) AS osm_id
+              FROM osm_feature f
+              CROSS JOIN bounds b
+             WHERE f.layer = #{layer}
+            <include refid="tileFilters"/>
         )
         <!-- bytea 不走 MyBatis 的 byte[] 映射：该别名实际是 Byte[]，运行期会抛出 argument type mismatch。 -->
+        SELECT encode(ST_AsMVT(rows, #{layer}, 4096, 'geom'), 'base64')
+          FROM rows
+         WHERE geom IS NOT NULL
+    </select>
+
+    <!--
+      城市瓦片先按图层取出几何再裁切。
+      不物化的话，优化器会把 ST_AsMVTGeom 推进空间索引，把同一块里其他图层的几何也投影一遍。
+    -->
+    <select id="mvtCity" resultType="string">
+        WITH bounds AS MATERIALIZED (
+            SELECT env AS g3857,
+                   ST_Transform(env, 4326) AS g4326
+              FROM (SELECT ST_TileEnvelope(#{z}, #{x}, #{y}) AS env) envelope
+        ),
+        hits AS MATERIALIZED (
+            SELECT <include refid="sourceGeom"/> AS geom,
+                   COALESCE(f.name, '') AS name,
+                   f.sub_type AS subtype,
+                   f.layer AS layer,
+                   f.region_code AS region,
+                   CAST(f.osm_id AS text) AS osm_id
+              FROM osm_feature f
+              CROSS JOIN bounds b
+             WHERE f.layer = #{layer}
+            <include refid="tileFilters"/>
+        ),
+        rows AS (
+            SELECT ST_AsMVTGeom(ST_Transform(h.geom, 3857), b.g3857, 4096, 64, true) AS geom,
+                   h.name,
+                   h.subtype,
+                   h.layer,
+                   h.region,
+                   h.osm_id
+              FROM hits h
+              CROSS JOIN bounds b
+        )
         SELECT encode(ST_AsMVT(rows, #{layer}, 4096, 'geom'), 'base64')
           FROM rows
          WHERE geom IS NOT NULL

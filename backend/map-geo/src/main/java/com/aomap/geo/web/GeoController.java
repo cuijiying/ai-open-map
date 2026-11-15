@@ -41,22 +41,23 @@ public class GeoController {
     public ResponseEntity<byte[]> tile(@PathVariable String layer, @PathVariable int z,
                                        @PathVariable int x, @PathVariable int y,
                                        @RequestParam(required = false) String regions,
-                                       @RequestParam(required = false) String region) {
+                                       @RequestParam(required = false) String region,
+                                       @RequestParam(required = false, name = "v") String revision) {
         return ResponseEntity.ok()
                 .contentType(MVT)
                 .cacheControl(CacheControl.maxAge(cacheFor(z)).cachePublic())
-                .body(tiles.tile(regionArgument(regions, region), layer, z, x, y));
+                .body(tiles.tile(regionArgument(regions, region), layer, z, x, y, revision));
     }
 
-    /** 低缩放瓦片覆盖范围大、计算贵，而且发布后页面会用新的 v 参数绕过缓存。 */
+    /** 发布后页面会用新的 v 参数绕过缓存。城市一级瓦片可以放得更久。 */
     private static Duration cacheFor(int z) {
         if (z <= 6) {
             return Duration.ofMinutes(10);
         }
         if (z <= 11) {
-            return Duration.ofMinutes(5);
+            return Duration.ofMinutes(10);
         }
-        return Duration.ofMinutes(2);
+        return Duration.ofMinutes(30);
     }
 
     @PostMapping("/api/v1/geo/tiles/prebuild")
