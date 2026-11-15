@@ -22,6 +22,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -91,8 +92,20 @@ public class IngestService {
         List<Source> plan = OsmMirrors.resolve(region, sourceId);
         long id = jobs.insertRunning(region.code(), region.name(), plan.get(0).pbfUrl(), triggerType);
         String label = plan.size() == 1 ? plan.get(0).name() : "自动（优先 " + plan.get(0).name() + "）";
-        jobs.addLog(id, "DOWNLOAD", "INFO", "任务已启动，区域 " + region.name() + "，下载源 " + label);
+        jobs.addLog(id, "DOWNLOAD", "INFO", "任务已排队，区域 " + region.name() + "，下载源 " + label);
         executor.submit(() -> run(id, region, sourceId));
+        return jobs.find(id);
+    }
+
+    public JobView cancel(long id) {
+        JobView existing = jobs.find(id);
+        if (existing == null) {
+            throw new IllegalArgumentException("任务不存在");
+        }
+        if (!jobs.cancel(id)) {
+            throw new IllegalStateException("任务已结束，不能取消");
+        }
+        jobs.addLog(id, "FAILED", "INFO", "任务已取消");
         return jobs.find(id);
     }
 
@@ -121,7 +134,9 @@ public class IngestService {
         int[] logged = {-1};
         String[] phase = {""};
         IngestProgress progress = (nextPhase, percent, message) -> {
-            jobs.updateProgress(id, nextPhase, percent, message);
+            if (!jobs.updateProgress(id, nextPhase, percent, message)) {
+                throw new CancellationException("任务已取消");
+            }
             if (!nextPhase.equals(phase[0]) || percent - logged[0] >= 10) {
                 jobs.addLog(id, nextPhase, "INFO", message);
                 phase[0] = nextPhase;
@@ -129,20 +144,49 @@ public class IngestService {
             }
         };
         try {
+            if (!jobs.claim(id)) {
+                return;
+            }
             Path file = downloader.download(properties, region, sourceId, progress, source -> jobs.updateSource(id, source.pbfUrl()));
+            ensureRunning(id);
             jobs.updateFile(id, file.toAbsolutePath().toString(), Files.size(file));
             long count = importer.importFile(file, id, region.code(), properties.isIncludeBuildings(), progress);
+            ensureRunning(id);
             Map<String, Long> layers = features.countByLayer(region.code());
             String summary = region.name() + " 数据已入库，共 " + count + " 条要素";
             jobs.addLog(id, "SUCCESS", "INFO", summary);
             jobs.succeed(id, summary, count, layers);
             log.info(summary);
+        } catch (CancellationException ex) {
+            log.info("入库任务已取消: {}", id);
         } catch (Exception ex) {
+            if (isCancel(ex)) {
+                log.info("入库任务已取消: {}", id);
+                return;
+            }
             log.error("入库任务失败", ex);
             String message = rootMessage(ex);
             jobs.addLog(id, "FAILED", "ERROR", message);
             jobs.fail(id, message);
         }
+    }
+
+    private void ensureRunning(long id) {
+        JobView job = jobs.find(id);
+        if (job == null || !"RUNNING".equals(job.status())) {
+            throw new CancellationException("任务已取消");
+        }
+    }
+
+    private static boolean isCancel(Throwable ex) {
+        Throwable current = ex;
+        while (current != null) {
+            if (current instanceof CancellationException) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private static String rootMessage(Throwable ex) {

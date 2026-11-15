@@ -95,7 +95,7 @@ export default function Workbench() {
 
   const refreshJob = useCallback(async (code: string) => {
     const list = await api<JobView[]>('/api/v1/ingest/jobs?limit=40')
-    const running = list.filter((item) => item.status === 'RUNNING')
+    const running = list.filter((item) => item.status === 'QUEUED' || item.status === 'RUNNING')
     const matched = running.find((item) => item.regionCode === code)
       ?? list.find((item) => item.regionCode === code)
       ?? null
@@ -104,7 +104,7 @@ export default function Workbench() {
     const previous = runningIdsRef.current
     const finished = previous
       .map((id) => list.find((item) => item.id === id))
-      .filter((item): item is JobView => item != null && item.status !== 'RUNNING')
+      .filter((item): item is JobView => item != null && item.status !== 'QUEUED' && item.status !== 'RUNNING')
     runningIdsRef.current = running.map((item) => item.id)
     setActiveCount(running.length)
     const succeeded = finished.filter((item) => item.status === 'SUCCESS' && item.regionCode)
@@ -167,7 +167,7 @@ export default function Workbench() {
   }, [refreshLayers, mapRegions, tileRevision])
 
   useEffect(() => {
-    if (activeCount === 0 && job?.status !== 'RUNNING') {
+    if (activeCount === 0 && job?.status !== 'QUEUED' && job?.status !== 'RUNNING') {
       return
     }
     const timer = window.setInterval(() => {
@@ -271,6 +271,17 @@ export default function Workbench() {
     }
   }
 
+  async function cancelJob(id: number) {
+    try {
+      const updated = await api<JobView>(`/api/v1/ingest/jobs/${id}/cancel`, { method: 'POST' })
+      setJob(updated)
+      message.success('已取消')
+      await refreshJob(regionCode)
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '取消失败')
+    }
+  }
+
   async function startJob() {
     const region = regions.find((item) => item.code === regionCode)
     setStarting(true)
@@ -285,7 +296,7 @@ export default function Workbench() {
         runningIdsRef.current = [...runningIdsRef.current, created.id]
       }
       const sourceName = sources.find((item) => item.id === sourceId)?.name ?? ''
-      message.success(`已开始从${sourceName}下载${region?.name ?? ''}数据`)
+      message.success(`已把${region?.name ?? ''}加入下载队列${sourceName ? `（${sourceName}）` : ''}`)
     } catch (error) {
       message.error(error instanceof Error ? error.message : '启动失败')
     } finally {
@@ -414,11 +425,11 @@ export default function Workbench() {
   }
 
   const runningLabel = useMemo(() => {
-    if (job?.status === 'RUNNING') {
+    if (job?.status === 'QUEUED' || job?.status === 'RUNNING') {
       return `${job.message ?? '正在入库'} · 地图仍显示 ${mapLabel}`
     }
     if (activeCount > 0) {
-      return `${activeCount} 个省正在入库 · 地图仍显示 ${mapLabel}`
+      return `${activeCount} 个省正在排队或入库 · 地图仍显示 ${mapLabel}`
     }
     return mapLabel
   }, [activeCount, job, mapLabel])
@@ -473,6 +484,7 @@ export default function Workbench() {
             onSourceChange={chooseSource}
             onTest={testSource}
             onStart={startJob}
+            onCancel={cancelJob}
           />
         </Sider>
         <Content className="map-content">

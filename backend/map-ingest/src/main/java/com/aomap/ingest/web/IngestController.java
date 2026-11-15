@@ -61,6 +61,11 @@ public class IngestController {
         return ApiResult.ok(ingestService.latest());
     }
 
+    @PostMapping("/jobs/{id}/cancel")
+    public ApiResult<JobView> cancel(@PathVariable long id) {
+        return ApiResult.ok(ingestService.cancel(id));
+    }
+
     @GetMapping("/jobs/{id}")
     public ApiResult<JobView> get(@PathVariable long id) {
         return ApiResult.ok(ingestService.get(id));

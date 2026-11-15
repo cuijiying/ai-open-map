@@ -30,6 +30,7 @@ interface Props {
   onSourceChange: (id: string) => void
   onTest: () => void
   onStart: () => void
+  onCancel: (id: number) => void
 }
 
 function elapsedText(ms: number) {
@@ -39,10 +40,10 @@ function elapsedText(ms: number) {
 export default function JobPanel({
   regions, regionCode, mapRegions, sources, sourceId, probe, probing, job, logs, loading,
   activeCount, prebuild, prebuilding, onPrebuild,
-  onRegionChange, onMapRegionsChange, onFit, onLocate, onSourceChange, onTest, onStart
+  onRegionChange, onMapRegionsChange, onFit, onLocate, onSourceChange, onTest, onStart, onCancel
 }: Props) {
-  const selectedRunning = job?.status === 'RUNNING' && job.regionCode === regionCode
-  const running = selectedRunning
+  const selectedActive = job != null && job.regionCode === regionCode && (job.status === 'QUEUED' || job.status === 'RUNNING')
+  const running = selectedActive
   const current = Math.max(0, PHASES.findIndex((item) => item.key === job?.phase))
   const selectedRegion = regions.find((item) => item.code === regionCode)
   const selectedSource = sources.find((item) => item.id === sourceId)
@@ -90,9 +91,14 @@ export default function JobPanel({
       ) : null}
       <div className="panel-title">
         <span>数据入库</span>
-        <Button type="primary" size="small" loading={loading || running} disabled={running || !regionCode} onClick={onStart}>
-          下载
-        </Button>
+        <span className="panel-actions">
+          {running && job ? (
+            <Button size="small" onClick={() => onCancel(job.id)}>取消</Button>
+          ) : null}
+          <Button type="primary" size="small" loading={loading || running} disabled={running || !regionCode} onClick={onStart}>
+            下载
+          </Button>
+        </span>
       </div>
       <div className="source-current">
         <Select
@@ -139,11 +145,11 @@ export default function JobPanel({
       ) : null}
       {running && job ? (
         <Typography.Paragraph type="secondary" className="hint">
-          正在处理{job.regionName}。下载、解析和建索引不改已发布的地图。同一省不能同时入库两次，其他省可以同时下载。
+          {job.status === 'QUEUED' ? '正在排队' : '正在处理'}{job.regionName}。下载、解析和建索引不改已发布的地图。同一省不能同时排队两次，其他省可以同时下载。
         </Typography.Paragraph>
       ) : activeCount > 0 ? (
         <Typography.Paragraph type="secondary" className="hint">
-          还有 {activeCount} 个省正在入库。当前选择的省可以同时开始。
+          还有 {activeCount} 个省正在排队或入库。当前选择的省可以同时开始。
         </Typography.Paragraph>
       ) : null}
       <Typography.Paragraph type="secondary" className="hint">
@@ -158,10 +164,10 @@ export default function JobPanel({
           <Steps
             size="small"
             current={job.status === 'SUCCESS' ? 4 : current}
-            status={job.status === 'FAILED' ? 'error' : job.status === 'SUCCESS' ? 'finish' : 'process'}
+            status={job.status === 'FAILED' || job.status === 'CANCELLED' ? 'error' : job.status === 'SUCCESS' ? 'finish' : job.status === 'QUEUED' ? 'wait' : 'process'}
             items={PHASES.map((item) => ({ title: item.title }))}
           />
-          <Progress percent={job.progress} size="small" status={job.status === 'FAILED' ? 'exception' : job.status === 'SUCCESS' ? 'success' : 'active'} />
+          <Progress percent={job.progress} size="small" status={job.status === 'FAILED' || job.status === 'CANCELLED' ? 'exception' : job.status === 'SUCCESS' ? 'success' : 'active'} />
           <div className="job-message">{job.message}</div>
           {job.featureCount ? <Tag color="blue">要素 {job.featureCount.toLocaleString('zh-CN')}</Tag> : null}
         </>

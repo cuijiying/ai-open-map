@@ -16,15 +16,36 @@
                error = '服务重启，任务已中断',
                message = '服务重启，任务已中断',
                finished_at = now()
-         WHERE status = 'RUNNING'
+         WHERE status IN ('RUNNING', 'QUEUED')
     </update>
 
     <insert id="insertRunning" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
         INSERT INTO ingest_job
             (region_code, region_name, status, phase, progress, message, source_url, trigger_type, started_at)
         VALUES
-            (#{regionCode}, #{regionName}, 'RUNNING', 'DOWNLOAD', 0, '任务已创建，准备下载', #{sourceUrl}, #{triggerType}, now())
+            (#{regionCode}, #{regionName}, 'QUEUED', 'DOWNLOAD', 0, '排队中', #{sourceUrl}, #{triggerType}, NULL)
     </insert>
+
+    <update id="claim">
+        UPDATE ingest_job
+        SET status = 'RUNNING',
+            phase = 'DOWNLOAD',
+            message = '开始下载',
+            started_at = now()
+        WHERE id = #{id}
+          AND status = 'QUEUED'
+    </update>
+
+    <update id="cancel">
+        UPDATE ingest_job
+        SET status = 'CANCELLED',
+            phase = 'FAILED',
+            message = '已取消',
+            error = '已取消',
+            finished_at = now()
+        WHERE id = #{id}
+          AND status IN ('QUEUED', 'RUNNING')
+    </update>
 
     <update id="updateProgress">
         UPDATE ingest_job
@@ -59,6 +80,7 @@
                finished_at = now(),
                error = NULL
          WHERE id = #{id}
+           AND status = 'RUNNING'
     </update>
 
     <update id="fail">

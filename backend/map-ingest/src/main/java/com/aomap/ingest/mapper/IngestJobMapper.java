@@ -15,6 +15,10 @@ public interface IngestJobMapper {
 
     int insertRunning(JobInsert job);
 
+    int claim(@Param("id") long id);
+
+    int cancel(@Param("id") long id);
+
     int updateProgress(@Param("id") long id, @Param("phase") String phase,
                        @Param("progress") int progress, @Param("message") String message);
 

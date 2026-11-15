@@ -41,7 +41,7 @@ public class JobRepository {
         try {
             jobs.insertRunning(job);
         } catch (DuplicateKeyException ex) {
-            throw new IllegalStateException("该省已有入库任务正在执行，其他省可以同时下载");
+            throw new IllegalStateException("该省已有入库任务在排队或执行，其他省可以同时下载");
         }
         if (job.getId() == null) {
             throw new IllegalStateException("创建任务失败");
@@ -49,8 +49,16 @@ public class JobRepository {
         return job.getId();
     }
 
-    public void updateProgress(long id, String phase, int progress, String message) {
-        jobs.updateProgress(id, phase, Math.max(0, Math.min(progress, 100)), message);
+    public boolean claim(long id) {
+        return jobs.claim(id) > 0;
+    }
+
+    public boolean cancel(long id) {
+        return jobs.cancel(id) > 0;
+    }
+
+    public boolean updateProgress(long id, String phase, int progress, String message) {
+        return jobs.updateProgress(id, phase, Math.max(0, Math.min(progress, 100)), message) > 0;
     }
 
     public void updateFile(long id, String path, long bytes) {
